@@ -106,19 +106,19 @@ suite.check("leather is never offered to a mail wearer",
     Alts:Judge(ns.db.characterGear["Player-8"], "item:6") == nil)
 suite.check("mail is", Alts:Judge(ns.db.characterGear["Player-8"], "item:5") ~= nil)
 ns.db.characterGear["Player-8"] = nil
--- For Butler (soonOnly), mail for a hunter far from 40 waits; from 38 it is
--- offered, and a warrior wearing mail now is never held back.
+-- Mail for a hunter far from 40 waits, for Butler and the tooltip alike;
+-- from 38 it is offered, and a warrior wearing mail now is never held back.
 ns.db.characterGear["Player-8"] = { class = "HUNTER", level = 10, realm = "Here", faction = "Horde",
     worn = { [5] = "item:11" } }
 local hunter = ns.db.characterGear["Player-8"]
-suite.check("mail waits for a level 10 hunter", Alts:Judge(hunter, "item:5", true) == nil)
-suite.check("but the tooltip still says it", Alts:Judge(hunter, "item:5") ~= nil)
+suite.check("mail waits for a level 10 hunter", Alts:Judge(hunter, "item:5") == nil)
+suite.check("and the tooltip says nothing yet", Alts:BestFor("item:5") == nil or Alts:BestFor("item:5").key ~= "Player-8")
 hunter.level = 38
-local soon = Alts:Judge(hunter, "item:5", true)
+local soon = Alts:Judge(hunter, "item:5")
 suite.check("from 38 it is held", soon ~= nil and soon.level == 40, soon and soon.level)
 ns.db.characterGear["Player-8"] = { class = "WARRIOR", level = 10, realm = "Here", faction = "Horde",
     worn = { [5] = "item:11" } }
-suite.check("a warrior wears mail now", Alts:Judge(ns.db.characterGear["Player-8"], "item:5", true) ~= nil)
+suite.check("a warrior wears mail now", Alts:Judge(ns.db.characterGear["Player-8"], "item:5") ~= nil)
 ns.db.characterGear["Player-8"] = nil
 local W = ns.Weights
 suite.check("plate is too far for a warrior of 37", W:KindTooFar("WARRIOR", 37, ARMOR, 4, "INVTYPE_CHEST"))

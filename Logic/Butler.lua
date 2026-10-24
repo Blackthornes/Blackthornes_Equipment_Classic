@@ -76,7 +76,7 @@ local function Read(item, bag, slot)
         advice.sell = BagIcons:Sells(bag, slot, link, result) == true
         -- No use to the character playing: is it an upgrade for another?
         if not advice.upgrade and type(result) == "table" and ns.Alts then
-            local alt = ns.Alts:BestFor(link, true)
+            local alt = ns.Alts:BestFor(link)
             if alt then advice.alt = { key = alt.key, gain = alt.gain, level = alt.level } end
         end
     end

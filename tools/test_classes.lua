@@ -86,7 +86,12 @@ suite.check("and is told so", (ns.Compare:Describe(result)) == "Priests can't us
 
 ns = As("WARRIOR", {})
 result = ns.Compare:Judge("item:4")
+suite.check("plate at 20 is not for a warrior yet", result.verdict == "cantuse" and result.laterArmor == 40, result.verdict)
+local atTwenty = _G.UnitLevel
+_G.UnitLevel = function() return 38 end
+result = ns.Compare:Judge("item:4")
 suite.check("plate waits for 40 on a warrior", result.verdict == "upgrade" and result.level == 40, result.level)
+_G.UnitLevel = atTwenty
 suite.check("a warrior can use a shield", ns.Compare:Judge("item:5").verdict == "upgrade")
 suite.check("but not a wand", ns.Compare:Judge("item:6").verdict == "cantuse")
 
