@@ -253,6 +253,24 @@ suite.check("naming the biggest upgrade", take and take.label:GetText():find("fi
     take and take.label:GetText())
 suite.check("under the quest window, placed by screen position, not anchored to it",
     take and take._point and take._point[2] == UIParent)
+suite.check("with no foot buttons, it goes by the frame's own edges",
+    take and take._point and take._point[4] == 275 and take._point[5] == 196,
+    take and take._point and tostring(take._point[4]) .. "," .. tostring(take._point[5]))
+
+-- Classic Era: the frame reaches far below its art, so the button goes
+-- just under the window's own Complete Quest and Cancel buttons instead.
+_G.QuestFrameCompleteQuestButton = { IsVisible = function() return true end,
+    GetLeft = function() return 120 end, GetRight = function() return 230 end, GetBottom = function() return 280 end }
+_G.QuestFrameCancelButton = { IsVisible = function() return true end,
+    GetLeft = function() return 320 end, GetRight = function() return 420 end, GetBottom = function() return 282 end }
+_G.QuestFrameGoodbyeButton = { IsVisible = function() return false end,
+    GetLeft = function() return 0 end, GetRight = function() return 900 end, GetBottom = function() return 0 end }
+ns.QuestRewards:UpdateTake()
+suite.check("under the window's own buttons, not the frame's far edge",
+    take._point[4] == 270 and take._point[5] == 280 - ns.QuestRewards.FOOT_GAP - 4,
+    tostring(take._point[4]) .. "," .. tostring(take._point[5]))
+_G.QuestFrameCompleteQuestButton, _G.QuestFrameCancelButton, _G.QuestFrameGoodbyeButton = nil, nil, nil
+
 take:GetScript("OnClick")(take)
 suite.check("a click takes that reward", taken == 2, taken)
 

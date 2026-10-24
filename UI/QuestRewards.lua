@@ -320,6 +320,38 @@ function QuestRewards:BuildTake()
     return button
 end
 
+-- The quest window's own buttons along its foot. On Classic Era the frame
+-- reaches well past the art drawn for it, so its own edges sit far below
+-- what the player sees; these buttons mark where the window really ends.
+QuestRewards.FOOT_BUTTONS = {
+    "QuestFrameCompleteQuestButton", "QuestFrameCancelButton",
+    "QuestFrameCompleteButton", "QuestFrameGoodbyeButton",
+    "QuestFrameAcceptButton", "QuestFrameDeclineButton",
+}
+-- How far under the lowest of those buttons the window's rim ends.
+QuestRewards.FOOT_GAP = 10
+
+--- Left, right and bottom of the quest window as the player sees it: from
+--- the shown buttons along its foot, else the frame's own edges.
+function QuestRewards.Edges()
+    local left, right, bottom
+    for _, name in ipairs(QuestRewards.FOOT_BUTTONS) do
+        local button = rawget(_G, name)
+        if button and Ask(button, "IsVisible") then
+            local l, r, b = Ask(button, "GetLeft"), Ask(button, "GetRight"), Ask(button, "GetBottom")
+            if type(l) == "number" and type(r) == "number" and type(b) == "number" then
+                left = left and math.min(left, l) or l
+                right = right and math.max(right, r) or r
+                bottom = bottom and math.min(bottom, b) or b
+            end
+        end
+    end
+    if left and right and bottom then
+        return left, right, bottom - QuestRewards.FOOT_GAP
+    end
+    return Ask(_G.QuestFrame, "GetLeft"), Ask(_G.QuestFrame, "GetRight"), Ask(_G.QuestFrame, "GetBottom")
+end
+
 --- Show the button under the quest window for the pick, or hide it.
 function QuestRewards:UpdateTake()
     local index, link, words
@@ -330,8 +362,7 @@ function QuestRewards:UpdateTake()
         if self.take then self.take:Hide() end
         return
     end
-    local left, bottom = Ask(_G.QuestFrame, "GetLeft"), Ask(_G.QuestFrame, "GetBottom")
-    local right = Ask(_G.QuestFrame, "GetRight")
+    local left, right, bottom = QuestRewards.Edges()
     if not (left and bottom and right) then return end
     local button = self:BuildTake()
     button.choice, button.link = index, link
