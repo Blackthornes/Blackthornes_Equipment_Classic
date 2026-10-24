@@ -76,11 +76,16 @@ suite.check("a shield is no use to a hunter", result.verdict == "cantuse", resul
 suite.check("and says so", (Compare:Describe(result)) == "Hunters can't use this")
 
 result = Compare:Judge("item:6")
-suite.check("mail at 20 waits for 40", result.verdict == "upgrade" and result.level == 40, result.level)
+suite.check("mail at 20 is not for a hunter yet", result.verdict == "cantuse" and result.laterArmor == 40, result.verdict)
+local atTwenty = _G.UnitLevel
+_G.UnitLevel = function() return 38 end
+result = Compare:Judge("item:6")
+suite.check("mail at 38 waits for 40", result.verdict == "upgrade" and result.level == 40, result.level)
 text, color = Compare:Describe(result)
 suite.check("the line names the level", text == "Upgrade for Beast Mastery at level 40: +200%", text)
 suite.check("in the warning colour", color == "warn", color)
 suite.check("and there is no arrow yet", not Compare:IsUpgradeNow("item:6"))
+_G.UnitLevel = atTwenty
 
 result = Compare:Judge("item:8")
 suite.check("an item above your level waits for it", result.level == 25, result.level)

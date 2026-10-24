@@ -59,6 +59,15 @@ over it.
   or the learned list after it would be skipped. A Forever change to either
   function is a clash to blend; keep the `or false`.
 
+### Mail and plate learned later
+- Forever's `d55c65e` (only from 38) came over blended with Classic's PR #6.
+  Classic keeps one rule, `Weights:KindTooFar` (`Weights.KIND_SOON`, 2),
+  where Forever has `Compare.LATER_ARMOR_WITHIN`. `Compare:Judge` asks it
+  (`result.laterArmor`, no tooltip line), and `Alts:Judge` asks it for
+  every caller, so `Alts:BestFor` takes no `soonOnly`. Butler's own check
+  stays as a guard. On a catch-up, keep `KindTooFar` and drop Forever's
+  constant.
+
 ### Notes and docs
 - `CLAUDE.md` opens with "This repo is the Classic Era copy".
 - `README.md` names the Classic CurseForge project.

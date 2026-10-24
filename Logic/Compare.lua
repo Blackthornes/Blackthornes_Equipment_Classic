@@ -427,6 +427,16 @@ function Compare:Judge(link)
         return result
     end
 
+    -- Armor of a kind the class learns later (mail or plate at 40), far off
+    -- yet: not for it until Weights.KIND_SOON levels before, so no tooltip
+    -- line, arrow or keep for many levels (the owner, 2026-10-24).
+    if Weights:KindTooFar(class, Items:PlayerLevel(),
+        info.classID, info.subclassID, info.equipLoc) then
+        result.verdict = "cantuse"
+        result.laterArmor = fromLevel
+        return result
+    end
+
     -- Best Armor Only, ticked on this character: lighter armor than the
     -- heaviest kind it wears is not for it (no tooltip line of its own). A
     -- kind learned later counts in a slot once that slot holds a piece of it.
@@ -713,7 +723,7 @@ function Compare:Describe(result)
     local verdict, spec = result.verdict, result.specName
     local percent = result.percent and ("%+d%%"):format(math.floor(result.percent + 0.5)) or nil
 
-    if verdict == "cantuse" and result.lighterArmor then
+    if verdict == "cantuse" and (result.lighterArmor or result.laterArmor) then
         return nil
     elseif verdict == "cantuse" and result.ignoredSkill then
         return L.Format("Ignored until you train %s", result.ignoredSkill), "muted"

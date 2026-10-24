@@ -367,7 +367,7 @@ end
 --- How one item does for one character's note: nil when it is no upgrade
 --- (or the note has no worn gear to judge it against), else { gain (whole percent, nil for an empty slot), level (when it can
 --- only be worn later) }.
-function Alts:Judge(note, link, soonOnly)
+function Alts:Judge(note, link)
     if type(note) ~= "table" or not note.class then return nil end
     -- With no gear on record nothing is known to be an upgrade.
     if type(note.worn) ~= "table" or not next(note.worn) then return nil end
@@ -387,8 +387,8 @@ function Alts:Judge(note, link, soonOnly)
     if not Weights:IsBestArmor(note.class, note.level, info.classID, info.subclassID, info.equipLoc) then
         return nil
     end
-    -- For Butler, armor of a kind this character learns far ahead waits.
-    if soonOnly and Weights:KindTooFar(note.class, note.level, info.classID, info.subclassID, info.equipLoc) then
+    -- Armor of a kind this character learns far ahead waits (as Compare:Judge).
+    if Weights:KindTooFar(note.class, note.level, info.classID, info.subclassID, info.equipLoc) then
         return nil
     end
     if info.equipLoc == "INVTYPE_WEAPONOFFHAND" then
@@ -419,9 +419,9 @@ end
 --- The other character this item helps most: { key (its GUID), gain,
 --- level }, or nil. Only characters on the same realm and side as the one
 --- playing, so it can be mailed; an empty slot beats any percent, and an
---- upgrade to wear now beats one that waits on a level. `soonOnly`
---- (Butler) leaves out armor of a kind learned far ahead (Weights:KindTooFar).
-function Alts:BestFor(link, soonOnly)
+--- upgrade to wear now beats one that waits on a level. Armor of a kind
+--- learned far ahead is left out (Weights:KindTooFar).
+function Alts:BestFor(link)
     link = Items.PlainLink(link)
     if not link then return nil end
     -- Without the character playing's GUID its own note can't be told from
@@ -436,7 +436,7 @@ function Alts:BestFor(link, soonOnly)
         if key ~= me and type(note) == "table" and not self:IsSkipped(key)
             and (not realm or not note.realm or note.realm == realm)
             and (not faction or not note.faction or note.faction == faction) then
-            local result = self:Judge(note, link, soonOnly)
+            local result = self:Judge(note, link)
             if result then
                 local rank = (result.level and 0 or 2) + (result.gain == nil and 1 or 0)
                 local bestRank = best and ((best.level and 0 or 2) + (best.gain == nil and 1 or 0))
