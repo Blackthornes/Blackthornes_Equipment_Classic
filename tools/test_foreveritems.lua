@@ -1,6 +1,7 @@
 -- Gear Forever changed from Classic: Data/ForeverItems.lua carries the
 -- Forever client's required level, item level, classes, races and vendor
--- price, and the finder reads them over the Classic rows.
+-- price, and the finder reads them over the Classic rows. The Classic Era
+-- copy leaves the file out of the TOC, so only the laying is tested here.
 
 local env = dofile(lfs_cwd .. "/tools/testenv.lua")
 local suite = env.NewSuite("foreveritems")
@@ -9,37 +10,14 @@ local ns = env.Load()
 local Finder = ns.Finder
 
 --------------------------------------------------------------------------------
--- The shipped file
+-- Classic Era leaves it out
 --------------------------------------------------------------------------------
 
-suite.check("the shipped file loads", type(ns.ForeverItems) == "table" and next(ns.ForeverItems) ~= nil)
-
-local laidSource, laidCraft = 0, 0
-local wrong = nil
-for itemID, row in pairs(ns.ForeverItems) do
-    local item = ns.Sources.ITEMS[itemID]
-    local craft = ns.Crafts.ITEMS[itemID]
-    if item then
-        laidSource = laidSource + 1
-        if item[1] ~= row[1] or item[2] ~= row[2] or item[3] ~= row[3] or item[4] ~= row[4] then wrong = itemID end
-        if item.v and item[5] ~= row[5] then wrong = itemID end
-    end
-    if craft then
-        laidCraft = laidCraft + 1
-        if craft[4] ~= row[1] or craft[5] ~= row[2] or craft[6] ~= row[3] or craft[7] ~= row[4] then wrong = itemID end
-    end
-    if not item and not craft then wrong = wrong or itemID end
-end
-suite.check("every row is laid over a Classic item or craft", wrong == nil)
-suite.check("both the sources and the crafts are changed", laidSource > 0 and laidCraft > 0)
-
-for itemID, row in pairs(ns.ForeverItems) do
-    if #row ~= 5 then wrong = itemID end
-    for i = 1, 5 do
-        if type(row[i]) ~= "number" or row[i] < 0 then wrong = itemID end
-    end
-end
-suite.check("every row is five whole numbers", wrong == nil)
+-- The file stays in the repo so Forever changes merge cleanly, but the TOC
+-- leaves it out: on Era the Classic rows stand as they are.
+suite.check("no Forever item table on Era", ns.ForeverItems == nil)
+local classic = ns.Sources.ITEMS[193]
+suite.check("a Classic row keeps Classic's numbers", classic and classic[1] == 1 and classic[2] == 5 and classic[5] == 49)
 
 --------------------------------------------------------------------------------
 -- Laying one over

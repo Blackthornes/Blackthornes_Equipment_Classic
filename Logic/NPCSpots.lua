@@ -321,8 +321,10 @@ end
 
 --- Lay every shipped and learned vendor. Done at login, once.
 function NPCSpots:LayAllVendors()
+    -- A false stands in for a missing shipped list, so ipairs still reaches the
+    -- learned ones (on Classic Era the shipped list is left out).
     local added = false
-    for _, source in ipairs({ ns.ForeverVendors, type(ns.db) == "table" and ns.db.learnedVendors or nil }) do
+    for _, source in ipairs({ ns.ForeverVendors or false, type(ns.db) == "table" and ns.db.learnedVendors or nil }) do
         if type(source) == "table" then
             for npcID, rec in pairs(source) do
                 if self:LayVendor(npcID, rec) then added = true end

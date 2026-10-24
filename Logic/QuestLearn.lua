@@ -165,8 +165,10 @@ end
 
 --- Lay everything shipped and everything learned. Done at login, once.
 function QuestLearn:LayAll()
+    -- A false stands in for a missing shipped list, so ipairs still reaches the
+    -- learned ones (on Classic Era the shipped list is left out).
     local added = false
-    for _, source in ipairs({ ns.ForeverQuests, type(ns.db) == "table" and ns.db.learnedQuests or nil }) do
+    for _, source in ipairs({ ns.ForeverQuests or false, type(ns.db) == "table" and ns.db.learnedQuests or nil }) do
         if type(source) == "table" then
             for questID, rec in pairs(source) do
                 if self:Lay(questID, rec) then added = true end
