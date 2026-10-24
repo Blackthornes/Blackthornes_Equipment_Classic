@@ -72,6 +72,13 @@ over it.
 - `CLAUDE.md` opens with "This repo is the Classic Era copy".
 - `README.md` names the Classic CurseForge project.
 
+### Discord release posts
+- `tools/announce_discord.py` and `tools/post_general.py` start both
+  posts with "Classic Era: " (their `GAME`), where Forever's start with
+  "Forever: ", so the two games' releases read apart. A catch-up that
+  touches these tools keeps Classic's word. Tested in
+  `tools/test_announce_discord.py` and `tools/test_post_general.py`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.
