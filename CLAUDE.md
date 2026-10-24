@@ -32,8 +32,21 @@ comes first, and nothing done here may ever touch the Forever addon. So:
 - Never put Forever's CurseForge ID (1720051) in the TOC:
   `tools/check_release.py` refuses a tag that does. The owner makes the Era
   project himself; its ID goes on the TOC's `X-Curse-Project-ID` line then.
-- Not yet seen in an Era client. The Forever-only data, the talent tabs,
-  stats and the shared class training come next, a small PR each.
+- What only Forever has is left out of the TOC: `Data/ForeverItems.lua`,
+  `ForeverDrops.lua` (its dungeons and drops), `ForeverNPCs.lua`,
+  `ForeverQuests.lua`, `ForeverGoneQuests.lua`, `ForeverVendors.lua`,
+  `ForeverDungeonQuests.lua` and `Logic/Contribute.lua` (its recipients
+  are Forever characters; ask the owner before an Era version). The files
+  and their `tools/forever_*.py` stay in the repo so Forever changes merge
+  cleanly. Every reader asks for the table first, so Classic's data stands
+  alone, and what is learned in game (quests, vendors, spots, dungeon
+  quests) is still laid over it: a shipped list that is not there is
+  passed to `ipairs` as `false`, never nil, or the learned list after it
+  is skipped (`QuestLearn:LayAll`, `NPCSpots:LayAllVendors`).
+  `tools/test_era.lua` checks the TOC and that the finder, Dungeon Loot
+  and Dungeon Quests work without them.
+- Not yet seen in an Era client. The talent tabs, stats and the shared
+  class training come next, a small PR each.
 - The rest of this file describes the Forever addon; read it as the
   starting point, not as what Era has.
 

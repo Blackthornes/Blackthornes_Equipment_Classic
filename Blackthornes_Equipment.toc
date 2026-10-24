@@ -33,16 +33,9 @@ Data\WeaponTrainers.lua
 Data\Sources.lua
 Data\QuestStarts.lua
 Data\QuestEnds.lua
-Data\ForeverDrops.lua
-Data\ForeverNPCs.lua
-Data\ForeverQuests.lua
-Data\ForeverGoneQuests.lua
-Data\ForeverVendors.lua
 Data\DungeonQuests.lua
-Data\ForeverDungeonQuests.lua
 Data\DungeonDoorSpots.lua
 Data\Crafts.lua
-Data\ForeverItems.lua
 Data\Rolls.lua
 Data\ClassSpells.lua
 Data\Enchants.lua
@@ -72,7 +65,6 @@ Logic\DungeonQuests.lua
 Logic\DungeonLoot.lua
 Logic\DungeonDoors.lua
 Logic\TomTom.lua
-Logic\Contribute.lua
 
 UI\Theme.lua
 UI\BlizzardLook.lua

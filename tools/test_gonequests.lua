@@ -1,6 +1,7 @@
 -- Quests the Forever client does not have: Data/ForeverGoneQuests.lua names
 -- them, and the finder leaves them out, while a quest learned in game still
--- shows.
+-- shows. The Classic Era copy leaves the file out of the TOC, so only the
+-- leaving out is tested here.
 
 local env = dofile(lfs_cwd .. "/tools/testenv.lua")
 local suite = env.NewSuite("gonequests")
@@ -9,24 +10,13 @@ local ns = env.Load()
 local Finder = ns.Finder
 
 --------------------------------------------------------------------------------
--- The shipped file
+-- Classic Era leaves it out
 --------------------------------------------------------------------------------
 
-suite.check("the shipped file loads", type(ns.ForeverGoneQuests) == "table" and next(ns.ForeverGoneQuests) ~= nil)
-
-local left, linked = nil, nil
-for questID in pairs(ns.ForeverGoneQuests) do
-    if ns.Sources.QUESTS[questID] and not ns.Sources.QUESTS[questID].learned then left = questID end
-end
-for itemID, item in pairs(ns.Sources.ITEMS) do
-    for _, list in ipairs({ item.q or {}, item.g or {} }) do
-        for _, questID in ipairs(list) do
-            if ns.ForeverGoneQuests[questID] and not ns.Sources.QUESTS[questID] then linked = itemID end
-        end
-    end
-end
-suite.check("no quest the client lacks is left in the data", left == nil)
-suite.check("no item still points at one", linked == nil)
+-- Era has every Classic quest, so the TOC leaves the Forever list out and
+-- nothing is dropped. The file stays in the repo so Forever changes merge.
+suite.check("no Forever gone list on Era", ns.ForeverGoneQuests == nil)
+suite.check("a quest Forever lacks stays on Era", ns.Sources.QUESTS[9034] ~= nil)
 suite.check("quests the client has stay", ns.Sources.QUESTS[962] ~= nil)
 
 --------------------------------------------------------------------------------

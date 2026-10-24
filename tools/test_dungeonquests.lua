@@ -21,7 +21,7 @@ for _, q in pairs(ns.DUNGEON_QUESTS) do
 end
 suite.check("every quest names a dungeon the addon knows", unknown == 0, unknown)
 unknown = 0
-for _, q in pairs(ns.FOREVER_DUNGEON_QUESTS) do
+for _, q in pairs(ns.FOREVER_DUNGEON_QUESTS or {}) do
     if not DQ.Dungeon(q[1]) then unknown = unknown + 1 end
 end
 suite.check("so does every Forever quest", unknown == 0, unknown)
