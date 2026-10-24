@@ -1227,6 +1227,17 @@ function Weights:IsBestArmor(class, level, classID, subclassID, equipLoc)
     return rank >= best
 end
 
+--- Armor of a kind the class learns later (mail for a hunter or shaman,
+--- plate for a warrior or paladin, at 40) is worth holding for Butler only
+--- once the character is within KIND_SOON levels of it (the owner,
+--- 2026-10-24: a level 5 hunter kept chain leggings for level 40).
+Weights.KIND_SOON = 2
+function Weights:KindTooFar(class, level, classID, subclassID, equipLoc)
+    if classID ~= CLASS_ARMOR or type(level) ~= "number" then return false end
+    local ok, opens = self:CanUse(class, classID, subclassID, equipLoc)
+    return ok == true and type(opens) == "number" and level < opens - self.KIND_SOON
+end
+
 --- The heaviest body armor kind worn now, 0 for none (1 cloth to 4 plate),
 --- in the slots given, else in every armor slot.
 function Weights.WornArmorRank(slots)

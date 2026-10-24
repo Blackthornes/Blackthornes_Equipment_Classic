@@ -130,7 +130,12 @@ otherwise a table:
 
 - `upgrade`: "now" when the bag arrow shows (`Compare:JudgeCarried`,
   `Compare.WearableUpgrade`), "later" for an upgrade waiting on a level or
-  on training, nil otherwise.
+  on training, nil otherwise. Armor of a kind the class learns later (mail
+  for a hunter or shaman, plate for a warrior or paladin, at 40) is
+  "later" only from `Weights.KIND_SOON` (2) levels before; earlier it is
+  nil, so Butler sorts it as any other gear (the owner, 2026-10-24,
+  `Weights:KindTooFar`). `alt` follows the same rule for each other
+  character (`Alts:BestFor(link, true)`); the tooltip's alt line does not.
 - `gain`: the upgrade's size as a whole percent, nil when there is none to
   give (an empty slot) or it is no upgrade.
 - `sell`: true when the bag's sell coin would show on it (`BagIcons:Sells`,

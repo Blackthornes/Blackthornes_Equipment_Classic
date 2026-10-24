@@ -65,10 +65,20 @@ suite.check("worth 50 percent", advice.gain == 50, advice.gain)
 suite.check("is never sold", advice.sell == false and advice.tool == false)
 suite.check("the same as the bag arrow", ns.Compare:IsUpgradeNow("item:2", true))
 
+-- Mail is kept for a hunter only from 38 (the owner, 2026-10-24); at 20 it
+-- is no upgrade to hold, so Butler sorts it like anything else.
 advice = Butler:Advise("item:3", 0, 3)
-suite.check("mail waits for level 40", advice and advice.upgrade == "later", advice and advice.upgrade)
+suite.check("mail is not held at 20", advice and advice.upgrade == nil, advice and advice.upgrade)
+suite.check("and has no size", advice.gain == nil, advice.gain)
+local realLevel = _G.UnitLevel
+_G.UnitLevel = function() return 38 end
+ns.Compare:ForgetScores()
+advice = Butler:Advise("item:3", 0, 3)
+suite.check("from 38 mail waits for level 40", advice and advice.upgrade == "later", advice and advice.upgrade)
 suite.check("with its size", advice.gain == 200, advice.gain)
 suite.check("and is not sold", advice.sell == false)
+_G.UnitLevel = realLevel
+ns.Compare:ForgetScores()
 
 advice = Butler:Advise("item:6", 0, 6)
 suite.check("an empty slot is an upgrade now", advice and advice.upgrade == "now")
