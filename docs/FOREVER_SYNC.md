@@ -1,0 +1,11 @@
+# Forever sync
+
+Where this Classic Era copy stands against Forever Equipment
+(`Blackthornes/Blackthornes_Equipment`). Forever is only ever read from here.
+
+Last Forever commit copied over: `b871fde` (Forever main, the merge of its
+PR #244, 2026-10-23). This copy was made from it with its history on
+2026-10-24; nothing has come over since.
+
+Every catch-up reads `docs/CLASSIC_DIFFERENCES.md` first, and the PR that
+brings Forever commits over updates the line above to the newest one it took.
