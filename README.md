@@ -416,7 +416,8 @@ refuses a tag they disagree with. The middle number moves for new
 behaviour, the last for fixes alone; a tag like `v0.2.0-beta1` is uploaded as a beta.
 
 `.pkgmeta` leaves `tools/`, `docs/`, `deploy.ps1`, `CLAUDE.md` and this README
-out of the zip. The CurseForge project is 1720051, on the `X-Curse-Project-ID` line of the TOC.
+out of the zip. The CurseForge project is 1763347, the Equipment Classic project (never
+Forever's 1720051), on the `X-Curse-Project-ID` line of the TOC.
 Uploading also needs a `CF_API_KEY` repository secret in the repository's
 settings on github.com. Without both, the workflow
 still builds and checks the zip but uploads nothing to CurseForge.

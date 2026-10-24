@@ -10,8 +10,9 @@
 
 # Filled in once the project exists on each site. The packager reads these
 # to know where to upload; a line that stays commented is simply skipped.
-# X-Curse-Project-ID: (the Classic Era project's own ID goes here once it exists;
-# never Forever's 1720051)
+# This is the Classic Era copy. It gets its own CurseForge project; never put
+# the Forever project's ID (1720051) here, or a tag would upload Era to it.
+## X-Curse-Project-ID: 1763347
 # X-Wago-ID: 
 # X-WoWI-ID: 
 

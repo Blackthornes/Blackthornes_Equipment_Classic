@@ -31,7 +31,8 @@ comes first, and nothing done here may ever touch the Forever addon. So:
   Era client reports, 2026-10-24).
 - Never put Forever's CurseForge ID (1720051) in the TOC:
   `tools/check_release.py` refuses a tag that does. The owner makes the Era
-  project himself; its ID goes on the TOC's `X-Curse-Project-ID` line then.
+  project himself: Equipment Classic is **1763347** (2026-10-24), on the
+  TOC's `X-Curse-Project-ID` line, and `tools/test_era.lua` checks it is there.
 - What only Forever has is left out of the TOC: `Data/ForeverItems.lua`,
   `ForeverDrops.lua` (its dungeons and drops), `ForeverNPCs.lua`,
   `ForeverQuests.lua`, `ForeverGoneQuests.lua`, `ForeverVendors.lua`,
@@ -108,8 +109,9 @@ _G.BlackthornesEquipment.Enchants:ForRecipe(recipeID)
 A fresh table, never raises, laid out once per gear or weights change. Keep
 it stable; if it changes, change Tradeskills' `Upgrades:EnchantFor` too.
 
-The CurseForge project ID is **1720051** (the owner created it 2026-09-30), on the
-TOC's `X-Curse-Project-ID` line. The first release is 0.1.0.
+Forever's CurseForge project ID is **1720051** (the owner created it 2026-09-30).
+The Classic Era copy is **1763347**, on the TOC's `X-Curse-Project-ID` line;
+never Forever's. The first release is 0.1.0.
 
 ## What Butler calls here
 

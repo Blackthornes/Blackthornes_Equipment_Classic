@@ -19,6 +19,8 @@ suite.check("the TOC is not Forever's", not toc:find("## Interface: 16001", 1, t
 suite.check("the TOC names a Classic Era interface", toc:find("## Interface: 115", 1, true) ~= nil)
 suite.check("the TOC never names Forever's CurseForge project",
     not toc:find("^## X%-Curse%-Project%-ID:%s*1720051") and not toc:find("\n## X%-Curse%-Project%-ID:%s*1720051"))
+suite.check("the TOC names the Equipment Classic CurseForge project",
+    toc:find("\n## X%-Curse%-Project%-ID: 1763347%s") ~= nil)
 for _, file in ipairs({ "Data\\ForeverItems.lua", "Data\\ForeverDrops.lua", "Data\\ForeverNPCs.lua",
         "Data\\ForeverQuests.lua", "Data\\ForeverGoneQuests.lua", "Data\\ForeverVendors.lua",
         "Data\\ForeverDungeonQuests.lua", "Logic\\Contribute.lua" }) do
