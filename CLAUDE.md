@@ -13,6 +13,30 @@ Nothing private goes in this file (no local paths, emails or account names).
 It never ships: `.pkgmeta` leaves it out of the zip and
 `tools/check_package.py` refuses it.
 
+## This repo is the Classic Era copy
+
+`Blackthornes/Blackthornes_Equipment_Classic` is Equipment for WoW Classic
+Era, copied from `Blackthornes/Blackthornes_Equipment` (Forever) with its
+history on 2026-10-24 (the owner said build it, after Farmer's and Butler's
+Era copies). Its releases, tests and CurseForge page are its own. Forever
+comes first, and nothing done here may ever touch the Forever addon. So:
+
+- Never push to, or open PRs on, the Forever repo from work here. Changes
+  come over from Forever on purpose (cherry-pick or copy), never the other
+  way.
+- The addon folder and TOC stay `Blackthornes_Equipment`, the saved data
+  `BlackthornesEquipmentDB` and `BlackthornesEquipmentCharDB`, so nothing
+  is renamed.
+- The TOC names Era's interface, `## Interface: 11509` (what the owner's
+  Era client reports, 2026-10-24).
+- Never put Forever's CurseForge ID (1720051) in the TOC:
+  `tools/check_release.py` refuses a tag that does. The owner makes the Era
+  project himself; its ID goes on the TOC's `X-Curse-Project-ID` line then.
+- Not yet seen in an Era client. The Forever-only data, the talent tabs,
+  stats and the shared class training come next, a small PR each.
+- The rest of this file describes the Forever addon; read it as the
+  starting point, not as what Era has.
+
 ## How this repo was set up
 
 It copies its sisters on purpose, so check them before inventing a

@@ -1,4 +1,4 @@
-## Interface: 16001
+## Interface: 11509
 ## Title: Blackthornes Equipment
 ## Notes: Looks at the gear in your bags and the quest rewards on offer, and says which is best for your class and spec.
 ## Author: Blackthornes
@@ -10,7 +10,8 @@
 
 # Filled in once the project exists on each site. The packager reads these
 # to know where to upload; a line that stays commented is simply skipped.
-## X-Curse-Project-ID: 1720051
+# X-Curse-Project-ID: (the Classic Era project's own ID goes here once it exists;
+# never Forever's 1720051)
 # X-Wago-ID: 
 # X-WoWI-ID: 
 
