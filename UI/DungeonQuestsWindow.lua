@@ -91,14 +91,12 @@ local function SetPicked(row, picked)
 end
 
 local function Levels(dungeon)
-    if dungeon.forever and not dungeon.low then return L["New on Forever"] end
     if not dungeon.low then return "" end
     return L.Format("Levels %d to %d", dungeon.low, dungeon.high or dungeon.low)
 end
 
 --- The line under the dungeon's name on the right.
 function DQUI.Where(dungeon)
-    if dungeon.forever then return L["New on Forever. Quests you have seen show here."] end
     local zone = dungeon.door
     if not dungeon.low then return zone or "" end
     if not zone then return Levels(dungeon) .. "." end

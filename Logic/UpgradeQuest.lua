@@ -962,7 +962,6 @@ function UpgradeQuest:Steps(quest)
             if chance and chance < 100 and first.kind ~= "vendor" then
                 notes[#notes + 1] = L.Format("A %s%% drop.", tostring(chance))
             end
-            if first.forever then notes[#notes + 1] = L["Seen dropping on Forever."] end
             local others = {}
             for index = 2, #starter.places do others[#others + 1] = starter.places[index].name end
             if #others > 0 then
@@ -1128,7 +1127,6 @@ function UpgradeQuest:Steps(quest)
             zone == source.dungeon, door)
         local note = source.chance
             and L.Format("It's a %s%% drop, so it can take a few runs.", tostring(source.chance)) or nil
-        if source.forever then note = (note and note .. " " or "") .. L["Seen dropping on Forever."] end
         Add(L.Format("Defeat %s and loot %s", source.name or L["the boss"], link), have, nil, note)
     elseif source.kind == "craft" then
         local crafting = ns.Crafting

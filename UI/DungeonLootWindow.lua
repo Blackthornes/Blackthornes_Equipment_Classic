@@ -131,7 +131,6 @@ function DLUI.PaintChip(chip, on)
 end
 
 local function Levels(dungeon)
-    if dungeon.forever and not dungeon.low then return L["New on Forever"] end
     if not dungeon.low then return "" end
     return L.Format("Levels %d to %d", dungeon.low, dungeon.high or dungeon.low)
 end

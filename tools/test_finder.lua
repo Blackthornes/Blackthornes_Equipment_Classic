@@ -188,7 +188,7 @@ suite.check("without a rate when too few were counted",
     Finder:Describe(new) == "Captain Greenskin in The Deadmines (17-26)", Finder:Describe(new))
 suite.check("a Forever raid drop still waits for 60", #Finder:SourcesFor(1016, player) == 0)
 suite.check("and Forever-only gear is offered", Offered(Finder:Scan(), 1) == "1015", Offered(Finder:Scan(), 1))
-suite.check("tagged [Forever] in the window", ns.FinderUI.SourceLine(new):find("[Forever]", 1, true) ~= nil)
+suite.check("no [Forever] tag in the window", ns.FinderUI.SourceLine(new):find("Forever", 1, true) == nil)
 S.FOREVER, ITEMS["item:1015"] = {}, nil
 
 -- Somewhere in your own zone comes first.
