@@ -66,7 +66,9 @@ local function Read(item, bag, slot)
     if type(result) ~= "table" and not tool then return nil end
 
     local advice = { tool = tool, sell = false }
-    if type(result) == "table" and result.verdict == "upgrade" then
+    if type(result) == "table" and result.verdict == "upgrade"
+        and not (result.level and ns.Weights:KindTooFar(result.className, Items:PlayerLevel(),
+            info.classID, info.subclassID, info.equipLoc)) then
         advice.upgrade = (Compare.WearableUpgrade(result) and not result.skill) and "now" or "later"
         advice.gain = Gain(result)
     end
@@ -74,7 +76,7 @@ local function Read(item, bag, slot)
         advice.sell = BagIcons:Sells(bag, slot, link, result) == true
         -- No use to the character playing: is it an upgrade for another?
         if not advice.upgrade and type(result) == "table" and ns.Alts then
-            local alt = ns.Alts:BestFor(link)
+            local alt = ns.Alts:BestFor(link, true)
             if alt then advice.alt = { key = alt.key, gain = alt.gain, level = alt.level } end
         end
     end
@@ -87,7 +89,9 @@ end
 -- for the sell coin; without them that gear never gets `sell`.
 -- @return nil for anything that is not gear (or not loaded yet), else a table:
 --   upgrade  "now" (the bag arrow shows), "later" (an upgrade waiting on a
---            level or on training), or nil
+--            level or on training), or nil; armor of a kind the class learns later
+--            (mail or plate at 40) is "later" only from 38
+--            (Weights:KindTooFar), and goes to an alt only on the same terms
 --   gain     the upgrade's size as a whole percent, or nil
 --   sell     true when the bag's sell coin would show on it
 --   tool     true for gathering and profession tools and fishing poles,
