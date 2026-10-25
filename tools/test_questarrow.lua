@@ -558,4 +558,24 @@ do
     end
 end
 
+-- Drawn smaller, and a spot saved before stays where it was: kept in
+-- UIParent's units, the arrow's own (smaller) units are turned back.
+do
+    local frame = ArrowUI.frame or ArrowUI:Build()
+    local scale = ArrowUI.SCALE
+    suite.check("the arrow is drawn smaller", scale < 1)
+    local keptX, keptY = ns.db.questArrowX, ns.db.questArrowY
+    ns.db.questArrowX, ns.db.questArrowY = 650, 400
+    ArrowUI:RestorePosition()
+    local p = frame._point
+    suite.check("a saved spot is placed in the arrow's own units",
+        p and math.abs(p[4] - 650 / scale) < 0.01 and math.abs(p[5] - 400 / scale) < 0.01)
+    frame._cx, frame._cy = 650 / scale, 400 / scale
+    ArrowUI:SavePosition()
+    suite.check("and saved back in UIParent's units, unmoved",
+        math.abs(ns.db.questArrowX - 650) < 0.01 and math.abs(ns.db.questArrowY - 400) < 0.01)
+    ns.db.questArrowX, ns.db.questArrowY = keptX, keptY
+    ArrowUI:RestorePosition()
+end
+
 suite.done()
