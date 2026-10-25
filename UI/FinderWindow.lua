@@ -256,8 +256,7 @@ function FinderUI.SourceLine(source, zone)
     zone = zone or (ns.UpgradeQuest and ns.UpgradeQuest.Zone())
     local line = Colored(KIND_COLORS[source.kind] or "text", Finder.Label(source))
         .. "  " .. FinderUI.MarkZone(Finder:Describe(source), zone)
-    -- Seen on Forever, the way Farmer marks what it has confirmed.
-    if source.forever then line = line .. "  " .. Colored("good", "[Forever]") end
+    -- Classic Era shows no [Forever] tag (docs/CLASSIC_DIFFERENCES.md).
     return line
 end
 

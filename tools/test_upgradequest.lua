@@ -268,7 +268,7 @@ suite.check("a dungeon's steps", #steps == 4 and steps[1].text == "Travel to Wes
     and steps[2].text == "Gather a group and enter The Deadmines (levels 17 to 26)"
     and steps[3].text == "Defeat Edwin VanCleef and loot item:2001", steps[2].text)
 suite.check("in Westfall, the door is next", steps[1].done and current == 2, current)
-suite.check("with the drop chance", steps[3].note:find("5% drop", 1, true) and steps[3].note:find("Forever", 1, true),
+suite.check("with the drop chance and no Forever word", steps[3].note:find("5% drop", 1, true) and not steps[3].note:find("Forever", 1, true),
     steps[3].note)
 suite.check("the map takes you to the door", steps[2].place.zone == "Westfall")
 _G.GetRealZoneText = function() return "The Deadmines" end
