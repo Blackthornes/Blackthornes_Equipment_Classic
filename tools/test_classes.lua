@@ -270,4 +270,41 @@ end }
 local line = ns.Probe:Classes()
 suite.check("the probe lists the classes", line == "WARRIOR, HUNTER, DEATHKNIGHT (no weights)", line)
 
+-- A level 4 warlock was told a 2.1 dps dagger quest reward was "about the
+-- same" as a 0.9 dps one (2026-10-25): casters gave melee damage no weight,
+-- so two weapons with no stats always scored the same.
+ITEMS["item:50"] = { loc = "INVTYPE_WEAPON", class = WEAPON, subclass = 15,
+    stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 0.9 } }
+ITEMS["item:51"] = { loc = "INVTYPE_WEAPON", class = WEAPON, subclass = 15,
+    stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 2.1 } }
+ITEMS["item:52"] = { loc = "INVTYPE_WEAPON", class = WEAPON, subclass = 15,
+    stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 20 } }
+ITEMS["item:53"] = { loc = "INVTYPE_WEAPON", class = WEAPON, subclass = 15,
+    stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 15, ITEM_MOD_SPELL_POWER_SHORT = 8 } }
+for _, class in ipairs({ "WARLOCK", "MAGE", "PRIEST" }) do
+    ns = As(class, { [16] = "item:50" }, 4)
+    result = ns.Compare:Judge("item:51")
+    suite.check(class .. ": a dagger with more damage is an upgrade", result.verdict == "upgrade", result.verdict)
+    ns = As(class, { [16] = "item:52" }, 40)
+    result = ns.Compare:Judge("item:53")
+    suite.check(class .. ": spell power still beats a little weapon damage", result.verdict == "upgrade", result.verdict)
+end
+
+-- The same warlock was told a 10 armor vest with no stats was "about the
+-- same" as the 3 armor robe worn (2026-10-25).
+ITEMS["item:54"] = { loc = "INVTYPE_ROBE", class = ARMOR, subclass = 1, stats = { RESISTANCE0_NAME = 3 } }
+ITEMS["item:55"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = 1, stats = { RESISTANCE0_NAME = 10 } }
+ITEMS["item:56"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = 1,
+    stats = { RESISTANCE0_NAME = 60, ITEM_MOD_INTELLECT_SHORT = 6 } }
+ITEMS["item:57"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = 1,
+    stats = { RESISTANCE0_NAME = 40, ITEM_MOD_INTELLECT_SHORT = 8 } }
+for _, class in ipairs({ "WARLOCK", "MAGE", "PRIEST" }) do
+    ns = As(class, { [5] = "item:54" }, 4)
+    result = ns.Compare:Judge("item:55")
+    suite.check(class .. ": more armor on plain cloth is an upgrade", result.verdict == "upgrade", result.verdict)
+    ns = As(class, { [5] = "item:56" }, 40)
+    result = ns.Compare:Judge("item:57")
+    suite.check(class .. ": intellect still beats a little armor", result.verdict == "upgrade", result.verdict)
+end
+
 suite.done()
