@@ -5,18 +5,10 @@
 local _, ns = ...
 
 ns.WHATS_NEW = {
-    { version = "0.35.0", lines = {
-        "Dungeon Quests lists quests known to the addon done inside dungeons or raids, and which ones you've done.",
-        "Dungeon Loot shows what each dungeon's bosses drop, with the upgrades for you marked.",
-        "The gear window has tabs now: Upgrades, Enchants, Dungeon Quests, Dungeon Loot and Settings.",
-        "An item's tooltip can say which boss drops it. You pick under Boss Drops on the Gear page of Settings.",
-        "Every window has a size grip, and the General page has an Effects choice.",
-    } },
-    { version = "0.34.0", lines = {
-        "Where to Get Upgrades now lists your slots down the left. Pick a slot to see every upgrade for it, and tick which sources to show. \"Only what I can get now\" hides what you can't get yet.",
-        "Untrained Weapons on the Gear page of Settings is now Show or Hide, set for each character.",
-    } },
-    { version = "0.33.0", lines = {
-        "Each tooltip line Equipment adds can be Off, Shift or Always. You pick in Settings.",
+    { version = "0.1.0", lines = {
+        "Equipment is here for Classic Era. A green arrow shows on any item in your bags that's better than what you wear.",
+        "A Put It On button shows when a new upgrade lands in your bags.",
+        "Where to Get Upgrades lists upgrades from vendors, quests, dungeons, raids and crafting.",
+        "Dungeon Loot and Dungeon Quests show what each dungeon gives.",
     } },
 }
