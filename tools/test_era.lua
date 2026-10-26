@@ -23,7 +23,7 @@ suite.check("the TOC names the Equipment Classic CurseForge project",
     toc:find("\n## X%-Curse%-Project%-ID: 1763347%s") ~= nil)
 for _, file in ipairs({ "Data\\ForeverItems.lua", "Data\\ForeverDrops.lua", "Data\\ForeverNPCs.lua",
         "Data\\ForeverQuests.lua", "Data\\ForeverGoneQuests.lua", "Data\\ForeverVendors.lua",
-        "Data\\ForeverDungeonQuests.lua", "Logic\\Contribute.lua" }) do
+        "Data\\ForeverDungeonQuests.lua" }) do
     suite.check("the TOC leaves out " .. file, not toc:find("\n" .. file, 1, true))
 end
 for _, file in ipairs({ "Data\\Sources.lua", "Data\\Crafts.lua", "Data\\DungeonQuests.lua",
@@ -54,7 +54,13 @@ suite.check("no Forever quests, vendors or spots",
     ns.ForeverQuests == nil and ns.ForeverVendors == nil and ns.ForeverNPCs == nil)
 suite.check("no Forever dungeon quests", ns.FOREVER_DUNGEON_QUESTS == nil)
 suite.check("no quests dropped as gone", ns.ForeverGoneQuests == nil and ns.Sources.QUESTS[9034] ~= nil)
-suite.check("no sharing with Forever's characters", ns.Contribute == nil)
+suite.check("the TOC sends data to Blackthornes", toc:find("\nLogic\\Contribute.lua", 1, true) ~= nil)
+suite.check("only to the owner's Era characters", ns.Contribute ~= nil and (function()
+    for _, name in ipairs(ns.Contribute.RECIPIENTS) do
+        if name:find(" ", 1, true) or not name:find("-Ashkandi$") then return false end
+    end
+    return #ns.Contribute.RECIPIENTS > 0
+end)())
 
 -- The finder.
 local scanned, found = pcall(function() return ns.Finder:Scan() end)

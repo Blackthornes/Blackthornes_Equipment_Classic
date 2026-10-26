@@ -66,6 +66,7 @@ Logic\DungeonQuests.lua
 Logic\DungeonLoot.lua
 Logic\DungeonDoors.lua
 Logic\TomTom.lua
+Logic\Contribute.lua
 
 UI\Theme.lua
 UI\BlizzardLook.lua

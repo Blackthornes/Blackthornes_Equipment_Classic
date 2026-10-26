@@ -36,8 +36,7 @@ comes first, and nothing done here may ever touch the Forever addon. So:
 - What only Forever has is left out of the TOC: `Data/ForeverItems.lua`,
   `ForeverDrops.lua` (its dungeons and drops), `ForeverNPCs.lua`,
   `ForeverQuests.lua`, `ForeverGoneQuests.lua`, `ForeverVendors.lua`,
-  `ForeverDungeonQuests.lua` and `Logic/Contribute.lua` (its recipients
-  are Forever characters; ask the owner before an Era version). The files
+  `ForeverDungeonQuests.lua`. The files
   and their `tools/forever_*.py` stay in the repo so Forever changes merge
   cleanly. Every reader asks for the table first, so Classic's data stands
   alone, and what is learned in game (quests, vendors, spots, dungeon
@@ -46,6 +45,12 @@ comes first, and nothing done here may ever touch the Forever addon. So:
   is skipped (`QuestLearn:LayAll`, `NPCSpots:LayAllVendors`).
   `tools/test_era.lua` checks the TOC and that the finder, Dungeon Loot
   and Dungeon Quests work without them.
+- Sending vendors and quests to Blackthornes is in (the owner, 2026-10-26):
+  `Logic/Contribute.lua` names the owner's Era characters as Name-Realm,
+  and a player whose realm is not theirs sends nothing and sees no box,
+  since Era whispers reach only the same realm. `Core/Comm.lua` adds the
+  realm to a whisper's name (`WithRealm`, Tradeskills'). See
+  `docs/CLASSIC_DIFFERENCES.md`.
 - Not yet seen in an Era client. The talent tabs, stats and the shared
   class training come next, a small PR each.
 - The rest of this file describes the Forever addon; read it as the
