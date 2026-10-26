@@ -18,3 +18,7 @@ Brought over one at a time since:
 - `3308557` Start release posts with the game name (2026-10-24, copied
   by hand with "Classic Era" in place of "Forever"; see
   "Discord release posts" in `docs/CLASSIC_DIFFERENCES.md`).
+- `65e6c1e`, `80b98c4` and `90074aa` (sending vendors and quests to
+  Blackthornes, 2026-10-26), with Classic's own recipients; see "Sending
+  vendors and quests to Blackthornes goes to Era characters" in
+  `docs/CLASSIC_DIFFERENCES.md`.

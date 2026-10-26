@@ -276,9 +276,10 @@ end
 
 -- Logic/Contribute.lua: vendors and quest rewards sent to help the
 -- shipped data, off until ticked, and offered only where it can send
--- (North America). Its words wrap under the box, since they run long.
+-- (North America, and on Classic Era the realm the owner's characters are
+-- on). Its words wrap under the box, since they run long.
 function SettingsUI:BuildShareBox()
-    if not (ns.Contribute and ns.Contribute:InRegion()) then return end
+    if not (ns.Contribute and ns.Contribute:InRegion() and #ns.Contribute:Recipients() > 0) then return end
     local pages = self.pages
     local text = L["Share your data with Blackthornes to improve the Equipment AddOn."]
     local holder = CreateFrame("Frame", nil, pages.pages.about.content)

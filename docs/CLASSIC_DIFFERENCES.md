@@ -43,14 +43,28 @@ over it.
 - `Data/ForeverItems.lua`, `ForeverDrops.lua` (its dungeons and drops),
   `ForeverNPCs.lua`, `ForeverQuests.lua`, `ForeverGoneQuests.lua`,
   `ForeverVendors.lua`, `ForeverDungeonQuests.lua`.
-- `Logic/Contribute.lua`: its recipients are Forever characters, so nothing
-  is sent and the About page shows no share box. Ask the owner before an
-  Era version.
 - `tools/test_era.lua` checks the TOC and that the finder, Dungeon Loot and
   Dungeon Quests work without them. `tools/test_foreveritems.lua`,
   `test_gonequests.lua`, `test_dungeonquests.lua` and `test_settings.lua`
-  were changed to match (no gone list, no Forever dungeon quests, no share
-  box on Era).
+  were changed to match (no gone list, no Forever dungeon quests).
+
+### Sending vendors and quests to Blackthornes goes to Era characters
+The owner asked for it on Era (2026-10-26). `Logic/Contribute.lua` is
+Forever's (through `90074aa`) with Era's changes:
+- `RECIPIENTS` are the owner's Era characters, as Name-Realm, since Era
+  whispers need the realm. Era names have no surname, so `Receiving`
+  matches the name alone.
+- A whisper reaches only the sender's own realm, so `Recipients()` keeps
+  only names on the player's realm (`MyRealm`, `RealmKey`), none when the
+  realm can't be read, and the About page's box shows only then.
+- `REGIONS` is North America (1) only; Forever's test region 110 is gone.
+- `Core/Comm.lua` gets Tradeskills' `WithRealm`, so a whisper target
+  carries the realm.
+- The fold-in tools (`forever_quests.py --shared` and the others) write
+  Forever's data files, which Era's TOC leaves out. Where Era's shared
+  data goes is a question for the owner at release.
+- Tested in `tools/test_contribute.lua`, `tools/test_settings.lua` and
+  `tools/test_era.lua`.
 
 ### Learned lists still lay without the shipped ones
 - `QuestLearn:LayAll` (`Logic/QuestLearn.lua`) and `NPCSpots:LayAllVendors`

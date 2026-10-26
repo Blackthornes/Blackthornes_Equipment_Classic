@@ -304,15 +304,26 @@ local ns2 = env.Load()
 _G.UnitClass = function() return "Hunter", "HUNTER" end
 suite.check("no options API is not an error", ns2.SettingsUI:RegisterGameOptions() == false)
 
--- The share box on About sends to Forever's characters, so the Classic Era
--- copy leaves Logic/Contribute.lua out and shows no box, North America or not.
+-- The share box on About shows only in North America, on the realm the
+-- owner's Era characters are on, off until ticked.
 suite.check("no share box outside North America", ns.SettingsUI.controls.shareData == nil)
+local oldRealm = _G.GetNormalizedRealmName
 _G.GetCurrentRegion = function() return 1 end
+_G.GetNormalizedRealmName = function() return "Mankrik" end
+local ns4 = env.Load()
+_G.UnitClass = function() return "Hunter", "HUNTER" end
+ns4.SettingsUI:Build()
+suite.check("no share box on another realm", ns4.SettingsUI.controls.shareData == nil)
+_G.GetNormalizedRealmName = function() return "Ashkandi" end
 local ns3 = env.Load()
 _G.UnitClass = function() return "Hunter", "HUNTER" end
 ns3.SettingsUI:Build()
-suite.check("no sharing on Era", ns3.Contribute == nil)
-suite.check("no share box in North America either", ns3.SettingsUI.controls.shareData == nil)
+local share = ns3.SettingsUI.controls.shareData
+suite.check("a share box on the owner's realm", share ~= nil)
+suite.check("unticked at first", share and not share:GetChecked())
+if share then share:GetScript("OnClick")(share) end
+suite.check("ticking it turns sharing on", ns3.db.shareData == true)
 _G.GetCurrentRegion = nil
+_G.GetNormalizedRealmName = oldRealm
 
 suite.done()
