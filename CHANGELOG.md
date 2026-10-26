@@ -6,7 +6,7 @@ the top; a release is refused if its version has no section here.
 
 ## 0.1.1
 
-- **Fixes:** casters see better weapons and armor as upgrades at low levels.
+- **Fixes:** various bug fixes.
 
 ## 0.1.0
 
