@@ -23,6 +23,11 @@ tell a friend: no hype, no questions to the reader, no exclamation marks
 outside the thanks line, no dashes as punctuation, no "now you can". The
 tool prints a note for a shipped line that reads like an advert.
 
+## 0.1.1
+
+Fixes and changes:
+- Various bug fixes.
+
 ## 0.1.0
 
 - Equipment is here for Classic Era. A green arrow shows on any item in your bags that's better than what you wear.
