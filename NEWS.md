@@ -23,6 +23,13 @@ tell a friend: no hype, no questions to the reader, no exclamation marks
 outside the thanks line, no dashes as punctuation, no "now you can". The
 tool prints a note for a shipped line that reads like an advert.
 
+## 0.2.0
+
+- The Take button has a new gold look.
+
+Fixes and changes:
+- Various bug fixes.
+
 ## 0.1.1
 
 Fixes and changes:
