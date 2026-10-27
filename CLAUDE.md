@@ -1323,6 +1323,20 @@ line under each, `glassHover` and the gold wash only under the mouse. A
 gradient that fades goes through `Theme.LightGradient`, which hides it at
 0; faded with SetAlpha alone it stayed lit on Forever.
 
+## The gold plaque
+
+Buttons that sit out on the screen on their own wear the gold plaque (the
+owner picked it from a mockup, 2026-10-27, "Option B"): a gold rim with a
+red gem at each end round dark glass, the item's icon in a small gold
+frame, a first line saying what the click does and a second under it, and
+a soft glow that breathes while it waits (Effects Full; still on Subtle,
+none on Off). `UI/Plaque.lua` is the same file in Pets, Equipment and
+Farmer (a fix to it belongs in all three): `Plaque.Create(parent, { name,
+template, width })` and `:SetLines`, `:SetIcon`, `:SetGlowing`, `:Flash`.
+Here it is the Take button under the quest window: "Take NAME", then
+"+N% over what you wear" in green, or "Sells for X" (`QuestRewards:Pick`).
+Tested in `tools/test_questrewards.lua`. Not yet seen in game.
+
 ## The fold gem
 
 A player asked, the owner picked the mockup (2026-10-24), in all five

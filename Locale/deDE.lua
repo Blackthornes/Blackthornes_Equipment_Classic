@@ -320,10 +320,8 @@ L["Abandon quest"] = "Quest abbrechen"
 L["Click to use it."] = "Klicke, um ihn zu benutzen."
 
 -- UI/QuestRewards
-L["Take %s (%s)"] = "%s nehmen (%s)"
-L["Take %s (sells for %s)"] = "%s nehmen (verkauft für %s)"
+L["Sells for %s"] = "Verkauft für %s"
 L["Take %s"] = "%s nehmen"
-L["Take"] = "Nehmen"
 L["Click to hand in the quest and take this"] = "Klicke, um die Quest abzugeben und dies zu nehmen"
 L["better stats"] = "bessere Werte"
 L["this quest gives you %s, an upgrade for %s |c%s%s|r"] = "diese Quest gibt dir %s, eine Verbesserung für %s |c%s%s|r"

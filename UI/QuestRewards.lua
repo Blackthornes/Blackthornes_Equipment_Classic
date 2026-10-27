@@ -279,32 +279,46 @@ function QuestRewards:TakeEnabled()
     return not (ns.db and ns.db.rewardButton == false)
 end
 
---- What the button would take: index, link and its words, or nil.
+--- What the button would take: index, link, its first line ("Take NAME")
+--- and its second (how much better, or what a vendor pays), or nil. The
+--- fifth return says the second line is an upgrade, shown in green.
 function QuestRewards:Pick()
     if self:Count() < 2 then return nil end
     local index, link, result, unknown = self:Best()
     if index then
-        return index, link, L.Format("Take %s (%s)", NameOf(link), Compare:HowMuch(result))
+        local how = Compare:HowMuch(result)
+        local second = result.percent and L.Format("%s over what you wear", how) or how
+        return index, link, L.Format("Take %s", NameOf(link)), second, true
     end
     if unknown and unknown > 0 then return nil end
     local richIndex, richLink, copper = self:MostValuable()
     if richIndex then
         local money = copper and ns.Finder and ns.Finder.Money and ns.Finder.Money(copper)
-        local name = NameOf(richLink)
-        return richIndex, richLink, money and L.Format("Take %s (sells for %s)", name, money)
-            or L.Format("Take %s", name)
+        return richIndex, richLink, L.Format("Take %s", NameOf(richLink)),
+            money and L.Format("Sells for %s", money) or nil, false
     end
+end
+
+--- The icon of a reward, by its link, or nil.
+local function IconOf(link)
+    local icon = Items.Call({ "C_Item.GetItemIconByID", "GetItemIcon" }, link)
+    if icon then return icon end
+    local id = type(link) == "string" and tonumber(link:match("item:(%d+)"))
+    return id and Items.Call({ "C_Item.GetItemIconByID", "GetItemIcon" }, id) or nil
 end
 
 function QuestRewards:BuildTake()
     if self.take then return self.take end
-    local button = ns.Widgets.CreateButton(UIParent, L["Take"], function(frame)
+    -- The gold plaque (UI/Plaque.lua, the owner's pick, 2026-10-27): the
+    -- reward's icon, "Take NAME" and how much better it is.
+    local button = ns.Plaque.Create(UIParent, { minWidth = 160 })
+    button:SetScript("OnClick", function(frame)
         local index = rawget(frame, "choice")
         if not index then return end
         local take = rawget(_G, "GetQuestReward")
         if type(take) == "function" then pcall(take, index) end
         frame:Hide()
-    end, { width = 220, height = 24, primary = true })
+    end)
     button:SetFrameStrata("DIALOG")
     button:HookScript("OnEnter", function(frame)
         local link = rawget(frame, "link")
@@ -315,6 +329,7 @@ function QuestRewards:BuildTake()
         GameTooltip:Show()
     end)
     button:HookScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    button:HookScript("OnHide", function(frame) frame:SetGlowing(false) end)
     button:Hide()
     self.take = button
     return button
@@ -354,9 +369,9 @@ end
 
 --- Show the button under the quest window for the pick, or hide it.
 function QuestRewards:UpdateTake()
-    local index, link, words
+    local index, link, first, second, upgrade
     if self:IsEnabled() and self:TakeEnabled() and Ask(_G.QuestFrame, "IsShown") then
-        index, link, words = self:Pick()
+        index, link, first, second, upgrade = self:Pick()
     end
     if not index then
         if self.take then self.take:Hide() end
@@ -366,12 +381,13 @@ function QuestRewards:UpdateTake()
     if not (left and bottom and right) then return end
     local button = self:BuildTake()
     button.choice, button.link = index, link
-    button:SetText(words)
-    local width = math.max(160, (ns.Theme.TextWidth and ns.Theme.TextWidth("normal", words) or 200) + 28)
-    button:SetWidth(width)
+    button:SetIcon(IconOf(link))
+    button:SetLines(first, second)
+    if upgrade then button:SetSecondColor(ns.Theme.Unpack("good")) else button:SetSecondColor(nil) end
     button:ClearAllPoints()
     button:SetPoint("TOP", UIParent, "BOTTOMLEFT", (left + right) / 2, bottom - 4)
     button:Show()
+    button:SetGlowing(true)
 end
 
 function QuestRewards:HideTake()
