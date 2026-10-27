@@ -287,7 +287,7 @@ local tools = {}
 
 --- The tooltip's lines for a link, as plain strings.
 local function TooltipLines(link)
-    local data = Items.Call({ "C_TooltipInfo.GetHyperlink" }, link)
+    local data = Items.TooltipData(link)
     local ok, lines = pcall(function()
         local found = {}
         for _, line in ipairs(type(data) == "table" and type(data.lines) == "table" and data.lines or {}) do

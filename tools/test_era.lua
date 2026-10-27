@@ -150,4 +150,31 @@ do
     _G.GetNumQuestLogEntries, _G.GetQuestLogTitle = saved[1], saved[2]
 end
 
+-- Tooltips on Era: with no C_TooltipInfo the item's lines are read off a
+-- hidden tooltip of the addon's own.
+do
+    _G.C_TooltipInfo = nil
+    local Items = ns.Items
+    Items.TooltipData("item:2")             -- makes the hidden tooltip
+    local tip = _G.BlackthornesEquipmentScanTip
+    suite.check("a hidden tooltip is made", tip ~= nil)
+    local shown = {}
+    local pages = {
+        ["item:4001"] = { "Robe of Testing", "Classes: Mage", "Equip: Increases damage done by Frost spells and effects by up to 10." },
+    }
+    tip.SetOwner = function() end
+    tip.ClearLines = function() shown = {} end
+    tip.SetHyperlink = function(_, link) shown = pages[link] or { "Retrieving item information" } end
+    tip.NumLines = function() return #shown end
+    tip.Hide = function() end
+    for i = 1, 3 do
+        _G["BlackthornesEquipmentScanTipTextLeft" .. i] = { GetText = function() return shown[i] end }
+    end
+    local classes = Items:ClassesOnTooltip(4001)
+    suite.check("the Classes line is read", type(classes) == "table" and classes.mage == true)
+    local school = Items:SchoolDamage("item:4001")
+    suite.check("spell damage on gear is read", type(school) == "table" and school.frostDamage == 10)
+    suite.check("an item still loading names no classes", Items:ClassesOnTooltip(4002) == false)
+end
+
 suite.done()

@@ -118,6 +118,13 @@ Tested in `tools/test_era.lua`.
 don't answer, so a quest in the log, and done, counts on Era. A catch-up
 that brings Forever's file keeps the fallbacks. Tested in `tools/test_era.lua`.
 
+### Item tooltips without C_TooltipInfo
+`Items.TooltipData` in `Data/Items.lua` reads an item's tooltip lines from
+`C_TooltipInfo` when the client has it, else off a hidden tooltip of the
+addon's own (`BlackthornesEquipmentScanTip`). `Items:SchoolDamage`,
+`Items:ClassesOnTooltip` and `UI/BagIcons.lua`'s tool check read through it.
+A catch-up keeps it. Tested in `tools/test_era.lua`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.
