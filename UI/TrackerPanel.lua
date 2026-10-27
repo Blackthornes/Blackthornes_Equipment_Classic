@@ -115,7 +115,7 @@ function TrackerPanel:BuildRow(index)
                 return
             end
         end
-        if hunt.place and ns.Waypoints then ns.Waypoints:Show(hunt.place, hunt.place.name) end
+        if hunt.place and ns.Waypoints then ns.Waypoints:Show(hunt.place, hunt.place.name, hunt.link) end
     end)
     if row.RegisterForClicks then row:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
     row:Hide()

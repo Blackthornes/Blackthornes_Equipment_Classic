@@ -204,7 +204,7 @@ function SlotUpgrades:BuildRow(index)
 
     local map = Widgets.CreateButton(row, L["Map"], function()
         local source = row.pick and row.pick.sources and row.pick.sources[1]
-        if source and ns.Waypoints then ns.Waypoints:Show(source, source.name) end
+        if source and ns.Waypoints then ns.Waypoints:Show(source, source.name, row.pick.link) end
     end, { width = 58, height = 18 })
     map:SetPoint("TOPRIGHT", track, "BOTTOMRIGHT", 0, -2)
     row.map = map

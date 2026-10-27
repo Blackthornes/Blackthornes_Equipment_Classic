@@ -10,8 +10,11 @@
 -- IDs stand in (Waypoints.ZONE_MAPS, below).
 --
 -- The pin itself is the game's: C_Map.SetUserWaypoint, then tracked so the
--- game draws its arrow to it. Every call is inside a pcall; a client without
--- them simply cannot pin, and the finder says so.
+-- game draws its arrow to it. Every call is inside a pcall. Era's client
+-- takes no pin of its own (the calls may be there, but no map takes one),
+-- so there the place is kept as `Waypoints.marked` and UI/MapPins.lua draws
+-- it on the world map in Equipment's own gold ring instead. Only with the
+-- "Map pins" setting off does it say it couldn't.
 
 local _, ns = ...
 
@@ -249,14 +252,17 @@ end
 --- Put the map pin on a place { zone, x, y } (x and y 0-100 on the zone's
 --- map) and point the game's arrow at it.
 -- @return true, or false and why ("nospot", "noclient", "nomap")
-function Waypoints:Pin(place)
+-- `link` is the item it is for, the icon on Equipment's own pin.
+function Waypoints:Pin(place, link)
     if not (place and place.zone and place.x and place.y) then return false, "nospot" end
-    if not self:CanPin() then return false, "noclient" end
-    local mapID = self:MapFor(place.zone)
-    if not mapID then return false, "nomap" end
-    local x, y
-    mapID, x, y = Waypoints.PinnableSpot(mapID, place.x / 100, place.y / 100)
-    if not mapID then return false, "noclient" end
+    local zoneMap = self:MapFor(place.zone)
+    if not self:CanPin() then
+        if not zoneMap then return false, "nomap" end
+        return self:Mark(place, link, zoneMap)
+    end
+    if not zoneMap then return false, "nomap" end
+    local mapID, x, y = Waypoints.PinnableSpot(zoneMap, place.x / 100, place.y / 100)
+    if not mapID then return self:Mark(place, link, zoneMap) end
 
     local ok = pcall(function()
         local point = _G.UiMapPoint.CreateFromCoordinates(mapID, x, y)
@@ -266,13 +272,41 @@ function Waypoints:Pin(place)
             super.SetSuperTrackedUserWaypoint(true)
         end
     end)
-    if not ok then return false, "noclient" end
+    if not ok then return self:Mark(place, link, zoneMap) end
     -- The game can turn a pin down without a word: only a pin it kept counts.
     local map = Map()
     if map and type(map.HasUserWaypoint) == "function" and Read(map.HasUserWaypoint) == false then
-        return false, "noclient"
+        return self:Mark(place, link, zoneMap)
     end
+    self:Unmark()
     return true, mapID
+end
+
+--- Where the game takes no pin: keep the place for Equipment's own pin on
+--- the world map (UI/MapPins.lua), one at a time, for the session. Not with
+--- the "Map pins" setting off, which hides those pins.
+-- @return true and the zone's map, or false and "noclient"
+function Waypoints:Mark(place, link, mapID)
+    local pins = ns.MapPins
+    if not (pins and pins:IsEnabled()) then return false, "noclient" end
+    self.marked = { zone = place.zone, x = place.x, y = place.y, name = place.name,
+        text = place.text, items = place.items, link = link }
+    if pins.OnTrackingChanged then pins:OnTrackingChanged() end
+    return true, mapID
+end
+
+--- Take Equipment's own pin away (the game's took its place).
+function Waypoints:Unmark()
+    if not self.marked then return end
+    self.marked = nil
+    if ns.MapPins and ns.MapPins.OnTrackingChanged then ns.MapPins:OnTrackingChanged() end
+end
+
+--- Does the game take its own pin on this map? False on Era.
+function Waypoints:GamePins(mapID)
+    if not self:CanPin() then return false end
+    if not mapID then return true end
+    return Waypoints.PinnableSpot(mapID, 0.5, 0.5) ~= nil
 end
 
 --- A map the game takes a pin on, and the spot (0-1) on it. Some maps (a
@@ -303,9 +337,10 @@ local WHY = {
     nomap = L["the map for that zone could not be found"],
 }
 
---- Pin a place and say so in chat. `what` names it ("Corina Steele").
-function Waypoints:Show(place, what)
-    local ok, why = self:Pin(place)
+--- Pin a place and say so in chat. `what` names it ("Corina Steele"),
+--- `link` the item it is for.
+function Waypoints:Show(place, what, link)
+    local ok, why = self:Pin(place, link)
     if ok then
         -- `why` is the map the pin went on, which can be the one around it.
         ns.Print(L.Format("pinned %s on your map: %s (%s, %s)", what or place.name or L["it"],

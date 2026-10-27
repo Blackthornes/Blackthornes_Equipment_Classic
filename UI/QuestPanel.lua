@@ -1235,7 +1235,10 @@ end
 function QuestPanel:ShowOnMap()
     local place = ns.UpgradeQuest and ns.UpgradeQuest:NextPlace()
     if not (place and ns.Waypoints) then return false end
-    if place.x and place.y then return ns.Waypoints:Show(place, place.name) end
+    if place.x and place.y then
+        local quest = ns.UpgradeQuest:Current()
+        return ns.Waypoints:Show(place, place.name, quest and quest.link)
+    end
     -- No exact spot, only a zone: open the map on it.
     local mapID = ns.Waypoints:MapFor(place.zone)
     if mapID and type(_G.OpenWorldMap) == "function" then

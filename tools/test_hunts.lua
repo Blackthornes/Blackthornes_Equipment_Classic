@@ -128,7 +128,7 @@ suite.check("/beq tracked lists them", env.ChatText():find("tracking 1 upgrade",
 
 local place = Tracking:List()[1].place
 local ok, why = ns.Waypoints:Pin(place)
-suite.check("a client without map pins says so", ok == false and why == "noclient", why)
+suite.check("a client with no maps at all can't pin", ok == false and why == "nomap", why)
 suite.check("a hunt without a spot says so", select(2, ns.Waypoints:Pin({ zone = "Elwynn Forest" })) == "nospot")
 
 local waypoint, tracked, opened
@@ -161,13 +161,27 @@ suite.check("in a fight it still pins", ns.Waypoints:Show(place, "it") == true a
 suite.check("but leaves the map closed", opened == nil)
 _G.InCombatLockdown = nil
 
--- A pin the game turns down is never called pinned.
+-- A pin the game turns down is never called the game's: Equipment's own
+-- pin on the world map takes its place.
 _G.C_Map.HasUserWaypoint = function() return false end
+opened = nil
+suite.check("a pin the game turns down marks it with our own", ns.Waypoints:Show(place, "it", "item:2") == true
+    and ns.Waypoints.marked and ns.Waypoints.marked.x == place.x and ns.Waypoints.marked.link == "item:2")
+suite.check("and opens the zone's map", opened == 1429, opened)
+local onMap = ns.MapPins:HuntsOn("Elwynn Forest")
+local drawn = 0
+for _, hunt in ipairs(onMap) do
+    if hunt.place.x == place.x and hunt.place.y == place.y then drawn = drawn + 1 end
+end
+suite.check("drawn once, beside the hunt already there", drawn == 1, drawn)
+ns.MapPins:OnTrackingChanged()
+ns.db.mapPins = false
 local before = #env.chat
-suite.check("a pin the game turns down fails", ns.Waypoints:Show(place, "it") == false)
+suite.check("with map pins off it fails", ns.Waypoints:Show(place, "it") == false)
 local said = table.concat(env.chat, "\n", before + 1)
 suite.check("and says it couldn't, never pinned", said:find("Couldn't put a pin on the map.", 1, true) ~= nil
     and said:find("pinned", 1, true) == nil, said)
+ns.db.mapPins = nil
 _G.C_Map.HasUserWaypoint = function() return waypoint ~= nil end
 
 -- A map that takes no pin: the map around it, the spot moved over.
@@ -181,8 +195,15 @@ suite.check("a zone that takes no pin pins the map around it", ns.Waypoints:Show
 suite.check("at the same spot on it", waypoint and math.abs(waypoint.x - (0.4 + 0.421 * 0.2)) < 1e-9
     and math.abs(waypoint.y - (0.5 + 0.659 * 0.2)) < 1e-9)
 suite.check("and opens that map", opened == 1415, opened)
+suite.check("a pin the game kept takes ours away", ns.Waypoints.marked == nil)
+-- Era: no map takes the game's pin, so Equipment's own marks the place.
 _G.C_Map.CanSetUserWaypointOnMap = function() return false end
-suite.check("no map up the line takes one: it fails", select(2, ns.Waypoints:Pin(place)) == "noclient")
+waypoint = nil
+local okEra, eraMap = ns.Waypoints:Pin(place)
+suite.check("no map up the line takes one: our own pin marks it", okEra == true and eraMap == 1429
+    and waypoint == nil and ns.Waypoints.marked ~= nil, eraMap)
+suite.check("and the game's pin is not offered there", ns.Waypoints:GamePins(1429) == false)
+ns.Waypoints:Unmark()
 _G.C_Map.CanSetUserWaypointOnMap, _G.C_Map.GetMapRectOnMap, _G.C_Map.HasUserWaypoint = nil, nil, nil
 
 -- A cave or a floor sharing the zone's name: the zone's own map wins.

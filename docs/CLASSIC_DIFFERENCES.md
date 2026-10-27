@@ -125,6 +125,19 @@ addon's own (`BlackthornesEquipmentScanTip`). `Items:SchoolDamage`,
 `Items:ClassesOnTooltip` and `UI/BagIcons.lua`'s tool check read through it.
 A catch-up keeps it. Tested in `tools/test_era.lua`.
 
+### Show on map uses Equipment's own pin
+
+Era's client takes no map pin of its own (`C_Map.SetUserWaypoint` may be
+there, but no map takes one), so Show on map said "Couldn't put a pin on
+the map." `Waypoints:Pin` now keeps the place in `Waypoints.marked`
+(`Waypoints:Mark`, one at a time, for the session) and `UI/MapPins.lua`
+draws it in the gold ring the tracked hunts use, then opens the world map
+on that zone. The pin's hover leaves out "Click to pin it on your map"
+where the game takes no pin (`Waypoints:GamePins`). Only with the Map Pins
+setting off does it still say it couldn't. A Forever change to
+`Logic/Waypoints.lua` or `UI/MapPins.lua` is a clash to blend, keeping
+`Mark`. Tested in `tools/test_hunts.lua`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.
