@@ -579,7 +579,7 @@ function FinderUI:BuildRow(index)
         local okAlt, alt = pcall(function() return IsAltKeyDown() == true end)
         if okAlt and alt then
             local place = FinderUI.Place(pick)
-            if place and ns.Waypoints then ns.Waypoints:Show(place, place.name) end
+            if place and ns.Waypoints then ns.Waypoints:Show(place, place.name, pick.link) end
             return
         end
         if type(IsModifiedClick) == "function" and type(ChatEdit_InsertLink) == "function" then

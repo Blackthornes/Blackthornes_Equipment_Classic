@@ -100,6 +100,16 @@ function MapPins:HuntsOn(zone)
                 text = spot.name and L.Format("Upgrade quest: go to %s", spot.name) or L["Upgrade quest"] },
         }
     end
+    -- The place Show on map was last asked for, where the game takes no pin
+    -- of its own (Era), unless a pin above already sits there.
+    local marked = ns.Waypoints and ns.Waypoints.marked
+    if marked and marked.zone == zone and marked.x and marked.y then
+        local same = false
+        for _, hunt in ipairs(list) do
+            if hunt.place.x == marked.x and hunt.place.y == marked.y then same = true end
+        end
+        if not same then list[#list + 1] = { link = marked.link, marked = true, place = marked } end
+    end
     return list
 end
 
@@ -131,16 +141,27 @@ function MapPins:MakePin(canvas)
         local hunt = self.hunt
         if not hunt then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        pcall(GameTooltip.SetHyperlink, GameTooltip, hunt.link)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(hunt.quest and L["Upgrade quest"] or L["Tracked upgrade"], Theme.Unpack("accent"))
+        if hunt.link then
+            pcall(GameTooltip.SetHyperlink, GameTooltip, hunt.link)
+            GameTooltip:AddLine(" ")
+        elseif hunt.place.name then
+            GameTooltip:AddLine(hunt.place.name, Theme.Unpack("accent"))
+        end
+        if not hunt.marked then
+            GameTooltip:AddLine(hunt.quest and L["Upgrade quest"] or L["Tracked upgrade"], Theme.Unpack("accent"))
+        end
         if hunt.place.text then GameTooltip:AddLine(ns.Tracking.PlaceText(hunt.place), Theme.Unpack("text")) end
-        GameTooltip:AddLine(L["Click to pin it on your map"], Theme.Unpack("muted"))
+        -- Only where the game takes a pin of its own (never on Era).
+        if ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
+            GameTooltip:AddLine(L["Click to pin it on your map"], Theme.Unpack("muted"))
+        end
         GameTooltip:Show()
     end)
     pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
     pin:SetScript("OnClick", function(self)
-        if self.hunt and ns.Waypoints then ns.Waypoints:Pin(self.hunt.place) end
+        if self.hunt and ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
+            ns.Waypoints:Pin(self.hunt.place, self.hunt.link)
+        end
     end)
     return pin
 end
@@ -181,7 +202,10 @@ function MapPins:Draw()
             self.pins[index] = pin
         end
         pin.hunt = hunt
-        pin.icon:SetTexture(Theme.ItemIcon(hunt.link) or [[Interface\Icons\INV_Misc_QuestionMark]])
+        pin.mapID = view.mapID
+        pin.icon:SetTexture(Theme.ItemIcon(hunt.link)
+            or (hunt.marked and [[Interface\GossipFrame\AvailableQuestIcon]])
+            or [[Interface\Icons\INV_Misc_QuestionMark]])
         pin:SetScale(scale)
         pin:SetFrameLevel(level)
         pin:ClearAllPoints()
