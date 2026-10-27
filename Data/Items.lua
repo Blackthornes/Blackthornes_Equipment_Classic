@@ -135,6 +135,55 @@ function Items.SchoolLine(text)
     return nil
 end
 
+-- A hidden tooltip of our own, made the first time it is needed, for a
+-- client without C_TooltipInfo. Never shown; it only lays out the lines.
+local SCAN_NAME = "BlackthornesEquipmentScanTip"
+local scanTip
+
+local function ScanTip()
+    if scanTip ~= nil then return scanTip or nil end
+    local ok, tip = pcall(CreateFrame, "GameTooltip", SCAN_NAME, nil, "GameTooltipTemplate")
+    scanTip = ok and tip or false
+    return scanTip or nil
+end
+
+--- An item's tooltip as { lines = { { leftText }, ... } }: the client's own
+--- tooltip data when it has C_TooltipInfo, else read off the hidden
+--- tooltip. Nil when neither can say. `item` is a link or an item ID.
+function Items.TooltipData(item)
+    local data
+    if type(item) == "string" then
+        data = Call({ "C_TooltipInfo.GetHyperlink" }, item)
+        if type(data) ~= "table" then
+            local itemID = tonumber(item:match("item:(%d+)"))
+            if itemID then data = Call({ "C_TooltipInfo.GetItemByID" }, itemID) end
+        end
+    elseif tonumber(item) then
+        data = Call({ "C_TooltipInfo.GetItemByID" }, tonumber(item))
+    end
+    if type(data) == "table" then return data end
+    if Resolve("C_TooltipInfo.GetHyperlink") or Resolve("C_TooltipInfo.GetItemByID") then return nil end
+
+    local link = type(item) == "string" and item or (tonumber(item) and ("item:" .. tonumber(item)))
+    local tip = link and ScanTip()
+    if not tip then return nil end
+    local ok, lines = pcall(function()
+        tip:SetOwner(_G.WorldFrame or UIParent, "ANCHOR_NONE")
+        tip:ClearLines()
+        tip:SetHyperlink(link)
+        local found = {}
+        for i = 1, tip:NumLines() or 0 do
+            local left = _G[SCAN_NAME .. "TextLeft" .. i]
+            local text = left and left:GetText()
+            found[#found + 1] = { leftText = type(text) == "string" and text or nil }
+        end
+        tip:Hide()
+        return found
+    end)
+    if not ok or type(lines) ~= "table" or #lines == 0 then return nil end
+    return { lines = lines }
+end
+
 --- What one tooltip line says, inside a pcall: in an instance the text can
 --- be a secret value that raises when read.
 local function LineText(line)
@@ -157,11 +206,7 @@ function Items:SchoolDamage(link)
 
     -- By link first, so a random roll's own line is read; by item ID when
     -- the client has only that (Tradeskills reads sell prices that way).
-    local data = Call({ "C_TooltipInfo.GetHyperlink" }, link)
-    if type(data) ~= "table" then
-        local itemID = tonumber(link:match("item:(%d+)"))
-        if itemID then data = Call({ "C_TooltipInfo.GetItemByID" }, itemID) end
-    end
+    local data = Items.TooltipData(link)
     if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
 
     local found, lines = {}, 0
@@ -195,7 +240,7 @@ function Items:ClassesOnTooltip(itemID)
 
     local format = type(_G.ITEM_CLASSES_ALLOWED) == "string" and _G.ITEM_CLASSES_ALLOWED or "Classes: %s"
     local pattern = "^" .. format:gsub("([%%%(%)%.%+%-%*%?%[%]%^%$])", "%%%1"):gsub("%%%%s", "(.+)") .. "$"
-    local data = Call({ "C_TooltipInfo.GetItemByID" }, itemID)
+    local data = Items.TooltipData(itemID)
     if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
 
     local found, lines = false, 0

@@ -704,6 +704,15 @@ local function OnQuest(questID)
     if on ~= nil then return on == true end
     local index = Read(log and log.GetLogIndexForQuestID, questID)
     if index ~= nil then return (tonumber(index) or 0) > 0 end
+    -- Era has neither call: read the quest log itself.
+    local QL = ns.QuestLog
+    if QL and QL.Size and QL.Find then
+        local okSize, _, how = pcall(QL.Size)
+        if okSize and how then
+            local ok, found = pcall(QL.Find, QL, questID)
+            if ok then return found ~= nil end
+        end
+    end
     return nil
 end
 
@@ -711,7 +720,14 @@ end
 local function QuestReady(questID)
     local log = _G.C_QuestLog
     if Read(log and log.ReadyForTurnIn, questID) == true then return true end
-    return Read(log and log.IsComplete, questID) == true
+    if Read(log and log.IsComplete, questID) == true then return true end
+    -- Era has neither call: the quest log's own line says when it is done.
+    local QL = ns.QuestLog
+    if QL and QL.Find then
+        local ok, found = pcall(QL.Find, QL, questID)
+        if ok and type(found) == "table" then return found.complete == true end
+    end
+    return false
 end
 UpgradeQuest.QuestReady = QuestReady
 

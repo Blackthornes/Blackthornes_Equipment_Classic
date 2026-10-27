@@ -105,4 +105,76 @@ suite.check("a vendor learned in game is laid over the data",
     ns.Sources.NPCS[990002] ~= nil and ns.Sources.ITEMS[990003] ~= nil)
 suite.check("an NPC spot falls back to Classic's", ns.NPCSpots:Get(2999) == nil)
 
+-- Class spells: Forever's own (1,000,000 and up) and any the client lacks
+-- are left out, and a rank whose rank before went points past it.
+local CT = ns.ClassTraining
+ns.CLASS_SPELLS = { MAGE = {
+    { 116, 4, 1, "Frostbolt" },
+    { 1239696, 30, 2, "Arcane Blast", nil, 30451 },
+    { 205, 8, 2, "Frostbolt", nil, 116 },
+    { 777, 10, 3, "Frostbolt", nil, 205 },
+    { 778, 12, 4, "Frostbolt", nil, 777 },
+} }
+_G.C_Spell = _G.C_Spell or {}
+local saved = _G.C_Spell.DoesSpellExist
+_G.C_Spell.DoesSpellExist = function(id) return id ~= 777 end
+local list = CT.Spells("MAGE")
+local ids = {}
+for _, entry in ipairs(list) do ids[entry[1]] = entry end
+suite.check("Forever's own spell is left out", ids[1239696] == nil)
+suite.check("a spell the client lacks is left out", ids[777] == nil)
+suite.check("the others stay", ids[116] and ids[205] and ids[778] and #list == 3, #list)
+suite.check("the rank after the missing one follows the one before it", ids[778][6] == 205, ids[778][6])
+suite.check("the data itself is left alone", ns.CLASS_SPELLS.MAGE[5][6] == 777)
+suite.check("a class the data lacks has nothing", CT.Spells("NOBODY") == nil)
+_G.C_Spell.DoesSpellExist = saved
+
+-- The quest log on Era: no C_QuestLog quest calls, only the classic ones.
+-- The upgrade quest reads whether a quest is in the log, and done, from them.
+do
+    local savedLog = _G.C_QuestLog
+    local saved = { _G.GetNumQuestLogEntries, _G.GetQuestLogTitle }
+    _G.C_QuestLog = { IsQuestFlaggedCompleted = function() return false end }
+    local lines = {
+        { "Elwynn Forest", nil, nil, 1 },
+        { "Done Already", 10, nil, nil, nil, 1, nil, 4001 },
+        { "Still Going", 10, nil, nil, nil, nil, nil, 4002 },
+    }
+    _G.GetNumQuestLogEntries = function() return #lines end
+    _G.GetQuestLogTitle = function(i) local l = lines[i] return l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8] end
+    local UQ = ns.UpgradeQuest
+    suite.check("a done quest in Era's log is ready", UQ.QuestReady(4001) == true)
+    suite.check("one still going is not", UQ.QuestReady(4002) == false)
+    suite.check("one not in the log is not", UQ.QuestReady(4003) == false)
+    _G.C_QuestLog = savedLog
+    _G.GetNumQuestLogEntries, _G.GetQuestLogTitle = saved[1], saved[2]
+end
+
+-- Tooltips on Era: with no C_TooltipInfo the item's lines are read off a
+-- hidden tooltip of the addon's own.
+do
+    _G.C_TooltipInfo = nil
+    local Items = ns.Items
+    Items.TooltipData("item:2")             -- makes the hidden tooltip
+    local tip = _G.BlackthornesEquipmentScanTip
+    suite.check("a hidden tooltip is made", tip ~= nil)
+    local shown = {}
+    local pages = {
+        ["item:4001"] = { "Robe of Testing", "Classes: Mage", "Equip: Increases damage done by Frost spells and effects by up to 10." },
+    }
+    tip.SetOwner = function() end
+    tip.ClearLines = function() shown = {} end
+    tip.SetHyperlink = function(_, link) shown = pages[link] or { "Retrieving item information" } end
+    tip.NumLines = function() return #shown end
+    tip.Hide = function() end
+    for i = 1, 3 do
+        _G["BlackthornesEquipmentScanTipTextLeft" .. i] = { GetText = function() return shown[i] end }
+    end
+    local classes = Items:ClassesOnTooltip(4001)
+    suite.check("the Classes line is read", type(classes) == "table" and classes.mage == true)
+    local school = Items:SchoolDamage("item:4001")
+    suite.check("spell damage on gear is read", type(school) == "table" and school.frostDamage == 10)
+    suite.check("an item still loading names no classes", Items:ClassesOnTooltip(4002) == false)
+end
+
 suite.done()
