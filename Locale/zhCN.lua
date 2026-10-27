@@ -320,10 +320,8 @@ L["Abandon quest"] = "放弃任务"
 L["Click to use it."] = "点击使用它。"
 
 -- UI/QuestRewards
-L["Take %s (%s)"] = "拿%s（%s）"
-L["Take %s (sells for %s)"] = "拿%s（能卖%s）"
+L["Sells for %s"] = "能卖%s"
 L["Take %s"] = "拿%s"
-L["Take"] = "拿取"
 L["Click to hand in the quest and take this"] = "点击交任务并拿这个"
 L["better stats"] = "属性更好"
 L["this quest gives you %s, an upgrade for %s |c%s%s|r"] = "这个任务给你%s，是%s的升级 |c%s%s|r"

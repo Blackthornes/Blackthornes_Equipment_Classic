@@ -249,8 +249,9 @@ _G.GetQuestReward = function(choice) taken = choice end
 ns.QuestRewards:QUEST_COMPLETE()
 local take = ns.QuestRewards.take
 suite.check("a Take button on the hand-in page", take and take:IsShown())
-suite.check("naming the biggest upgrade", take and take.label:GetText():find("fills an empty slot", 1, true) ~= nil,
-    take and take.label:GetText())
+suite.check("naming the biggest upgrade", take and take.first:GetText():find("Take", 1, true) ~= nil
+    and take.second:GetText():find("fills an empty slot", 1, true) ~= nil,
+    take and (tostring(take.first:GetText()) .. " / " .. tostring(take.second:GetText())))
 suite.check("under the quest window, placed by screen position, not anchored to it",
     take and take._point and take._point[2] == UIParent)
 suite.check("with no foot buttons, it goes by the frame's own edges",
