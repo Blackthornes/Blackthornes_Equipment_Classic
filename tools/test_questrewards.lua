@@ -280,6 +280,8 @@ ns.QuestRewards:Moved()
 suite.check("gone when the window moves on", not take:IsShown())
 _G.QuestInfo_Display()
 suite.check("and not shown when a quest is only offered", not take:IsShown())
+ns.QuestRewards:UpdateTake()
+suite.check("nor when the setting is turned on there", not take:IsShown())
 
 -- No upgrade: it takes what sells for the most.
 ns = LoadWith({ "item:5", "item:6" })

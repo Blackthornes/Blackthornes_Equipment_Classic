@@ -370,7 +370,8 @@ end
 --- Show the button under the quest window for the pick, or hide it.
 function QuestRewards:UpdateTake()
     local index, link, first, second, upgrade
-    if self:IsEnabled() and self:TakeEnabled() and Ask(_G.QuestFrame, "IsShown") then
+    -- Only on the hand-in page: on an offer there is nothing to take yet.
+    if self.handingIn and self:IsEnabled() and self:TakeEnabled() and Ask(_G.QuestFrame, "IsShown") then
         index, link, first, second, upgrade = self:Pick()
     end
     if not index then
