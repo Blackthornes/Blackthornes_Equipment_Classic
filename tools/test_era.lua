@@ -129,4 +129,25 @@ suite.check("the data itself is left alone", ns.CLASS_SPELLS.MAGE[5][6] == 777)
 suite.check("a class the data lacks has nothing", CT.Spells("NOBODY") == nil)
 _G.C_Spell.DoesSpellExist = saved
 
+-- The quest log on Era: no C_QuestLog quest calls, only the classic ones.
+-- The upgrade quest reads whether a quest is in the log, and done, from them.
+do
+    local savedLog = _G.C_QuestLog
+    local saved = { _G.GetNumQuestLogEntries, _G.GetQuestLogTitle }
+    _G.C_QuestLog = { IsQuestFlaggedCompleted = function() return false end }
+    local lines = {
+        { "Elwynn Forest", nil, nil, 1 },
+        { "Done Already", 10, nil, nil, nil, 1, nil, 4001 },
+        { "Still Going", 10, nil, nil, nil, nil, nil, 4002 },
+    }
+    _G.GetNumQuestLogEntries = function() return #lines end
+    _G.GetQuestLogTitle = function(i) local l = lines[i] return l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8] end
+    local UQ = ns.UpgradeQuest
+    suite.check("a done quest in Era's log is ready", UQ.QuestReady(4001) == true)
+    suite.check("one still going is not", UQ.QuestReady(4002) == false)
+    suite.check("one not in the log is not", UQ.QuestReady(4003) == false)
+    _G.C_QuestLog = savedLog
+    _G.GetNumQuestLogEntries, _G.GetQuestLogTitle = saved[1], saved[2]
+end
+
 suite.done()

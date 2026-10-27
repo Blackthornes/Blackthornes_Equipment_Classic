@@ -112,6 +112,12 @@ says it lacks, pointing a rank's "rank before" past the dropped ones. A
 catch-up that brings Forever's file keeps `CT.Spells` and its four callers.
 Tested in `tools/test_era.lua`.
 
+### The upgrade quest reads Era's quest log
+`OnQuest` and `QuestReady` in `Logic/UpgradeQuest.lua` fall back to
+`QuestLog:Find` (the classic quest log calls) when the newer quest calls
+don't answer, so a quest in the log, and done, counts on Era. A catch-up
+that brings Forever's file keeps the fallbacks. Tested in `tools/test_era.lua`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.
