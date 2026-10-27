@@ -105,12 +105,16 @@ Forever's (through `90074aa`) with Era's changes:
   paragraph (the owner, 2026-10-24). `UI/About.lua` is shared with Forever;
   a catch-up that brings the paragraph back keeps Classic's.
 
+### Class training leaves Forever's spells out
+`Logic/ClassTraining.lua` is Butler Classic's copy: `CT.Spells(class)` drops
+Forever's own spells (IDs from `FOREVER_FIRST`, 1,000,000) and any the client
+says it lacks, pointing a rank's "rank before" past the dropped ones. A
+catch-up that brings Forever's file keeps `CT.Spells` and its four callers.
+Tested in `tools/test_era.lua`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.
-- `Logic/ClassTraining.lua` is still Forever's here. Butler Classic's copy
-  already leaves Forever's own spells out (`CT.Spells`); when Equipment's
-  gets the same, note it here, since Forever keeps the file the same in both.
 - Skyborne races in `Finder.Side` and `FOREVER_DUNGEON_PLACES` are left in;
   they are harmless on Era.
 - Not yet seen in an Era client. Client calls are read in a pcall.

@@ -105,4 +105,28 @@ suite.check("a vendor learned in game is laid over the data",
     ns.Sources.NPCS[990002] ~= nil and ns.Sources.ITEMS[990003] ~= nil)
 suite.check("an NPC spot falls back to Classic's", ns.NPCSpots:Get(2999) == nil)
 
+-- Class spells: Forever's own (1,000,000 and up) and any the client lacks
+-- are left out, and a rank whose rank before went points past it.
+local CT = ns.ClassTraining
+ns.CLASS_SPELLS = { MAGE = {
+    { 116, 4, 1, "Frostbolt" },
+    { 1239696, 30, 2, "Arcane Blast", nil, 30451 },
+    { 205, 8, 2, "Frostbolt", nil, 116 },
+    { 777, 10, 3, "Frostbolt", nil, 205 },
+    { 778, 12, 4, "Frostbolt", nil, 777 },
+} }
+_G.C_Spell = _G.C_Spell or {}
+local saved = _G.C_Spell.DoesSpellExist
+_G.C_Spell.DoesSpellExist = function(id) return id ~= 777 end
+local list = CT.Spells("MAGE")
+local ids = {}
+for _, entry in ipairs(list) do ids[entry[1]] = entry end
+suite.check("Forever's own spell is left out", ids[1239696] == nil)
+suite.check("a spell the client lacks is left out", ids[777] == nil)
+suite.check("the others stay", ids[116] and ids[205] and ids[778] and #list == 3, #list)
+suite.check("the rank after the missing one follows the one before it", ids[778][6] == 205, ids[778][6])
+suite.check("the data itself is left alone", ns.CLASS_SPELLS.MAGE[5][6] == 777)
+suite.check("a class the data lacks has nothing", CT.Spells("NOBODY") == nil)
+_G.C_Spell.DoesSpellExist = saved
+
 suite.done()
