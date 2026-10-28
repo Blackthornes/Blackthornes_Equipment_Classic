@@ -177,4 +177,22 @@ do
     suite.check("an item still loading names no classes", Items:ClassesOnTooltip(4002) == false)
 end
 
+-- Era says talents moved with its own events, not Forever's trait one, and
+-- a new spec changes every upgrade: the finder judges again, the bag arrows
+-- and tooltip lines are drawn again and the upgrade quest looks again.
+do
+    local function Fire(event, ...) ns.eventFrame:GetScript("OnEvent")(ns.eventFrame, event, ...) end
+    for _, event in ipairs({ "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
+        local before = ns.Finder.judgeGeneration or 0
+        ns.Finder.stale = false
+        local fired = pcall(Fire, event, -1)
+        suite.check(event .. " is heard", fired)
+        suite.check(event .. " has the finder judge again",
+            (ns.Finder.judgeGeneration or 0) > before and ns.Finder.stale == true)
+        ns.UpgradeQuest.rescan = nil
+        pcall(Fire, event, -1)
+        suite.check(event .. " has the upgrade quest look again", ns.UpgradeQuest.rescan == true)
+    end
+end
+
 suite.done()

@@ -1048,7 +1048,7 @@ end
 
 function Finder:OnEnable()
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED",
-        "TRAIT_CONFIG_UPDATED" }) do
+        "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, self.MarkStale)
     end
     -- Only answers a scan asked for: the client loads items for chat links
@@ -1057,7 +1057,11 @@ function Finder:OnEnable()
         if Finder:Asked(itemID) then Finder:MarkStale() end
     end)
     ns.RegisterEvent(self, "QUEST_TURNED_IN", self.OnQuestTurnedIn)
-    ns.RegisterEvent(self, "TRAIT_CONFIG_UPDATED", self.ForgetVerdicts)
+    -- Talents move the spec the weights come from: Forever's trait tree,
+    -- else Era's talent points.
+    for _, event in ipairs({ "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
+        ns.RegisterEvent(self, event, self.ForgetVerdicts)
+    end
     ns.RegisterEvent(self, "SKILL_LINES_CHANGED", self.ForgetVerdicts)
 end
 

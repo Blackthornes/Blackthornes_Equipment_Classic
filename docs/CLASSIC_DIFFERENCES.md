@@ -138,6 +138,17 @@ setting off does it still say it couldn't. A Forever change to
 `Logic/Waypoints.lua` or `UI/MapPins.lua` is a clash to blend, keeping
 `Mark`. Tested in `tools/test_hunts.lua`.
 
+### Talent points refresh the upgrades
+
+Forever says talents moved with `TRAIT_CONFIG_UPDATED`; Era says it with
+`CHARACTER_POINTS_CHANGED` and `PLAYER_TALENT_UPDATE`. `Logic/Weights.lua`
+and `Logic/Alts.lua` already heard both, but the finder's kept verdicts,
+the bag arrows, the tooltip lines, the upgrade quest and the gear window
+heard only Forever's, so a new spec on Era kept the old upgrades until the
+next gear or level change. They hear Era's too now (`Finder:OnEnable`,
+`BagIcons` and `FinderUI` `EVENTS`, `Tooltip:OnEnable`, `UpgradeQuest`'s
+`RESCAN_ON`). A catch-up keeps them. Tested in `tools/test_era.lua`.
+
 ## Not yet done
 - Talent tabs, stats and the shared class training come next, a small PR
   each (the project's `equipment-classic-plan.md`). Each adds its line here.

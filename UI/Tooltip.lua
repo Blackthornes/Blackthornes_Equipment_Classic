@@ -351,7 +351,7 @@ end
 
 function Tooltip:OnEnable()
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "TRAIT_CONFIG_UPDATED",
-        "SKILL_LINES_CHANGED", "GET_ITEM_INFO_RECEIVED" }) do
+        "SKILL_LINES_CHANGED", "GET_ITEM_INFO_RECEIVED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, Tooltip.ForgetLines)
     end
     self.fired = {}
