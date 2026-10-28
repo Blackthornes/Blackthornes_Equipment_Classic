@@ -23,6 +23,12 @@ tell a friend: no hype, no questions to the reader, no exclamation marks
 outside the thanks line, no dashes as punctuation, no "now you can". The
 tool prints a note for a shipped line that reads like an advert.
 
+## 0.3.0
+
+- Quest, people, zone and item names now show in your own language.
+- The Show on Map marker is bigger and easier to spot.
+- One minimap button now opens all your Blackthornes add-ons.
+
 ## 0.2.3
 
 Fixes and changes:

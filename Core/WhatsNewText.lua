@@ -5,6 +5,11 @@
 local _, ns = ...
 
 ns.WHATS_NEW = {
+    { version = "0.3.0", lines = {
+        "Quest, people, zone and item names now show in your own language.",
+        "The Show on Map marker is bigger and easier to spot.",
+        "One minimap button now opens all your Blackthornes add-ons.",
+    } },
     { version = "0.2.0", lines = {
         "The Take button has a new gold look.",
     } },
