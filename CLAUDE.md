@@ -1279,6 +1279,17 @@ finder, crafting lines, the tooltip's boss line, Dungeon Quests and Dungeon
 Loot, map pins and Show the way's chat lines. `/beq probe` has a "names"
 line. Tested in `tools/test_names.lua`. Not yet seen in game.
 
+The Show on map marker (the same player asked, the owner said build it
+from a mockup, 2026-10-28): on Era the place Show on map asks for
+(`Waypoints.marked`) is Equipment's own pin, and it is now bigger than the
+hunt pins (`MapPins.MARK_SIZE`, `MapPins:MakeMarker`): the icon in dark
+glass in a gold rim, a red gem on top, a soft beam above, a glow and two
+gold ripples at its foot, and the place's name in the player's language on
+a small plate under it (`DressMarker`). Only `Media/Frame/Glow.tga`, no new
+art. The glow breathes and the ripples run only with Effects on Full, as
+looping animations the game plays itself; Subtle and Off hold still. No
+new words. Tested in `tools/test_hunts.lua`. Not yet seen in game.
+
 ## Simplified Chinese, French, Spanish and Russian
 
 The owner said yes (2026-10-18) to these four in every addon, after Pets'
