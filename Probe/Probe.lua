@@ -460,6 +460,7 @@ function Probe:Upgrades()
         Line("random roll stats", stats and ((name or "unnamed") .. ": " .. stats)
             or "not readable (the item may not be cached yet; try again)")
     end
+    self:RollReadLine()
     if ns.Waypoints then
         local zone = _G.GetRealZoneText and select(2, pcall(_G.GetRealZoneText))
         local mapID = type(zone) == "string" and ns.Waypoints:MapFor(zone)
@@ -493,3 +494,51 @@ end
 ns.RegisterHiddenCommand("probe", function()
     ns.KeepCheck("probe", Probe.Run, Probe)
 end)
+
+--- How the first rolled gear in the bags is read: the game's own stats for
+--- it, what its tooltip adds, and which way the tooltip was read.
+function Probe:RollReadLine()
+    local items = ns.Items
+    if not items then return end
+    local getLink = _G.C_Container and _G.C_Container.GetContainerItemLink or _G.GetContainerItemLink
+    local getSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots or _G.GetContainerNumSlots
+    if type(getLink) ~= "function" or type(getSlots) ~= "function" then return end
+    local rolled
+    for bag = 0, 4 do
+        local okSlots, slots = pcall(getSlots, bag)
+        for slot = 1, okSlots and tonumber(slots) or 0 do
+            local ok, link = pcall(getLink, bag, slot)
+            link = ok and items.PlainLink(link)
+            if link and items.RollID(link) then rolled = link break end
+        end
+        if rolled then break end
+    end
+    Line("tooltip data calls", ("C_TooltipInfo %s, SurfaceArgs %s"):format(
+        tostring(Has("C_TooltipInfo.GetHyperlink")), tostring(Has("TooltipUtil.SurfaceArgs"))))
+    if not rolled then
+        Line("rolled gear in bags", "none")
+        return
+    end
+    local function Keys(stats)
+        local parts = {}
+        for key, value in pairs(stats or {}) do parts[#parts + 1] = key .. "=" .. tostring(value) end
+        table.sort(parts)
+        return #parts > 0 and table.concat(parts, ", ") or "none"
+    end
+    local okApi, api = pcall(_G.GetItemStats, rolled)
+    Line("rolled gear in bags", (rolled:match("%[(.-)%]") or rolled) .. ", roll " .. tostring(items.RollID(rolled)))
+    Line("game's stats for it", okApi and Keys(api) or "not readable")
+    local data = items.TooltipData(rolled)
+    local first = data and type(data.lines) == "table" and data.lines[2]
+    Line("tooltip data", data and (("%d lines, line 2 has leftText %s, args %s"):format(
+        type(data.lines) == "table" and #data.lines or 0, tostring(first and type(first.leftText)),
+        tostring(first and type(first.args)))) or "none")
+    local scan = items.ScanTooltip(rolled)
+    Line("hidden tooltip", scan and (#scan.lines .. " lines") or "none")
+    local okShown, shown = pcall(items.TooltipStats, items, rolled)
+    Line("roll stats read", okShown and Keys(shown) or "error")
+    local read = items.rollRead or {}
+    Line("roll read by", tostring(read.how) .. ", " .. tostring(read.lines) .. " lines")
+    local okStats, stats = pcall(items.Stats, items, rolled)
+    Line("stats counted", okStats and Keys(stats) or "error")
+end

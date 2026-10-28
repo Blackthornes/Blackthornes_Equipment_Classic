@@ -55,6 +55,10 @@ end
 
 --- The link of the item a tooltip shows, however this client offers it.
 function Tooltip:LinkFor(tooltip, data)
+    -- A bag button's own slot first: its link always carries the roll.
+    local fromBag = self:BagLink(tooltip)
+    if fromBag then return fromBag end
+
     local fromData = Items.PlainLink(Field(data, "hyperlink"))
     if fromData then return fromData end
 
@@ -79,6 +83,29 @@ function Tooltip:LinkFor(tooltip, data)
         if ok and text then return text end
     end
     return nil
+end
+
+--- The link in the bag slot whose button owns the tooltip, or nil.
+function Tooltip:BagLink(tooltip)
+    local getOwner = Field(tooltip, "GetOwner")
+    if type(getOwner) ~= "function" then return nil end
+    local ok, owner = pcall(getOwner, tooltip)
+    if not ok or type(owner) ~= "table" then return nil end
+    local okSlot, bag, slot = pcall(function()
+        local bagID = owner.GetBagID and owner:GetBagID()
+        if type(bagID) ~= "number" then
+            local name = owner.GetName and owner:GetName()
+            if type(name) ~= "string" or not name:find("^ContainerFrame%d+Item%d+$") then return nil end
+            local parent = owner:GetParent()
+            bagID = parent and parent:GetID()
+        end
+        return bagID, owner:GetID()
+    end)
+    if not okSlot or type(bag) ~= "number" or type(slot) ~= "number" then return nil end
+    local getLink = Field(_G.C_Container, "GetContainerItemLink") or _G.GetContainerItemLink
+    if type(getLink) ~= "function" then return nil end
+    local okLink, link = pcall(getLink, bag, slot)
+    return okLink and Items.PlainLink(link) or nil
 end
 
 --- Is the tooltip showing an item from one of the game's bag buttons? Only
@@ -271,6 +298,16 @@ function Tooltip:Decorate(tooltip, data)
     if mark and mark.link == link then
         local now = LineCount(tooltip)
         if not now or now >= mark.lines then return "duplicate" end
+    end
+
+    -- A random roll's stats ("+3 Agility") as this tooltip shows them,
+    -- in case no other read of the link gave them.
+    if Items:NoteShownTooltip(link, tooltip) then
+        local compare = ns.Compare
+        if compare and compare.ForgetScores then compare:ForgetScores() end
+        Tooltip.ForgetLines()
+        local bags = ns.BagIcons
+        if bags and bags.RefreshSoon then pcall(bags.RefreshSoon, bags) end
     end
 
     local lines = self:LinesFor(link, self:FromBag(tooltip))

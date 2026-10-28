@@ -70,4 +70,65 @@ stats = Items:Stats(both)
 suite.check("a stat the game gave is not added again", stats.ITEM_MOD_AGILITY_SHORT == 3
     and stats.ITEM_MOD_STAMINA_SHORT == 2)
 
+-- Older tooltip data keeps a line's words in its args, coloured.
+local argsLink = "item:15019:0:0:0:0:0:617:0"
+ITEMS[argsLink] = Boots({ RESISTANCE0_NAME = 49 })
+local realGet = _G.C_TooltipInfo.GetHyperlink
+_G.C_TooltipInfo.GetHyperlink = function(link)
+    if link ~= argsLink then return realGet(link) end
+    local lines = {}
+    for i, text in ipairs({ "Lupine Slippers of the Monkey", "49 Armor", "|cffffffff+3 Agility|r", "+2 Stamina" }) do
+        lines[i] = { args = { { field = "type", intVal = 0 }, { field = "leftText", stringVal = text } } }
+    end
+    return { lines = lines }
+end
+stats = Items:Stats(argsLink)
+suite.check("words kept in args are read", stats.ITEM_MOD_AGILITY_SHORT == 3 and stats.ITEM_MOD_STAMINA_SHORT == 2,
+    stats.ITEM_MOD_AGILITY_SHORT)
+
+-- Tooltip data with no words at all: our own hidden tooltip reads it.
+local scanLink = "item:15020:0:0:0:0:0:617:0"
+ITEMS[scanLink] = Boots({ RESISTANCE0_NAME = 49 })
+_G.C_TooltipInfo.GetHyperlink = function(link)
+    if link ~= scanLink then return realGet(link) end
+    return { lines = { {}, {}, {}, {} } }
+end
+local realCreate = _G.CreateFrame
+local scanned
+_G.CreateFrame = function(kind, name, ...)
+    if kind ~= "GameTooltip" then return realCreate(kind, name, ...) end
+    local tip, shown = {}, {}
+    function tip:SetOwner() end
+    function tip:ClearLines() shown = {} end
+    function tip:SetHyperlink(link)
+        scanned = link
+        if link == scanLink then shown = { "Lupine Slippers of the Monkey", "49 Armor", "+3 Agility", "+2 Stamina" } end
+        for i, text in ipairs(shown) do _G[name .. "TextLeft" .. i] = { GetText = function() return text end } end
+    end
+    function tip:NumLines() return #shown end
+    function tip:Hide() end
+    return tip
+end
+stats = Items:Stats(scanLink)
+suite.check("the hidden tooltip reads it", stats.ITEM_MOD_AGILITY_SHORT == 3, stats.ITEM_MOD_AGILITY_SHORT)
+suite.check("given the bare item string", scanned == scanLink, scanned)
+suite.check("and says how", Items.rollRead.how == "hidden tooltip", Items.rollRead.how)
+_G.CreateFrame = realCreate
+
+-- Nothing else reads it: the tooltip on screen does.
+local shownLink = "item:15021:0:0:0:0:0:617:0"
+ITEMS[shownLink] = Boots({ RESISTANCE0_NAME = 49 })
+_G.C_TooltipInfo.GetHyperlink = function(link)
+    if link ~= shownLink then return realGet(link) end
+    return nil
+end
+local onScreen = { "Lupine Slippers of the Monkey", "49 Armor", "+3 Agility", "+2 Stamina" }
+for i, text in ipairs(onScreen) do _G["TestTipTextLeft" .. i] = { GetText = function() return text end } end
+local tooltip = { GetName = function() return "TestTip" end, NumLines = function() return #onScreen end }
+suite.check("the shown tooltip is noted", Items:NoteShownTooltip(shownLink, tooltip) == true)
+stats = Items:Stats(shownLink)
+suite.check("and its stats count", stats.ITEM_MOD_AGILITY_SHORT == 3 and stats.ITEM_MOD_STAMINA_SHORT == 2)
+suite.check("plain gear is never noted", Items:NoteShownTooltip(EMBOSSED, tooltip) == false)
+_G.C_TooltipInfo.GetHyperlink = realGet
+
 suite.done()
