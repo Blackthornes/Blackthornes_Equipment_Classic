@@ -137,24 +137,18 @@ local function ScanTip()
     return scanTip or nil
 end
 
---- An item's tooltip as { lines = { { leftText }, ... } }: the client's own
---- tooltip data when it has C_TooltipInfo, else read off the hidden
---- tooltip. Nil when neither can say. `item` is a link or an item ID.
-function Items.TooltipData(item)
-    local data
-    if type(item) == "string" then
-        data = Call({ "C_TooltipInfo.GetHyperlink" }, item)
-        if type(data) ~= "table" then
-            local itemID = tonumber(item:match("item:(%d+)"))
-            if itemID then data = Call({ "C_TooltipInfo.GetItemByID" }, itemID) end
-        end
-    elseif tonumber(item) then
-        data = Call({ "C_TooltipInfo.GetItemByID" }, tonumber(item))
-    end
-    if type(data) == "table" then return data end
-    if Resolve("C_TooltipInfo.GetHyperlink") or Resolve("C_TooltipInfo.GetItemByID") then return nil end
+-- An item string with nothing round it ("item:123:0:..."), which the
+-- hidden tooltip takes on every client, where a full link can be refused.
+local function ItemString(item)
+    if type(item) == "string" then return item:match("item:[%-%d:]+") end
+    if tonumber(item) then return "item:" .. tonumber(item) end
+    return nil
+end
 
-    local link = type(item) == "string" and item or (tonumber(item) and ("item:" .. tonumber(item)))
+--- An item's tooltip read off our own hidden tooltip, as { lines = {
+--- { leftText }, ... } }, or nil when it can't be laid out.
+function Items.ScanTooltip(item)
+    local link = ItemString(item)
     local tip = link and ScanTip()
     if not tip then return nil end
     local ok, lines = pcall(function()
@@ -174,14 +168,55 @@ function Items.TooltipData(item)
     return { lines = lines }
 end
 
+-- Older tooltip data keeps each line's words in its args until the game's
+-- own TooltipUtil lays them out.
+local function Surface(data)
+    local surface = Resolve("TooltipUtil.SurfaceArgs")
+    if type(surface) ~= "function" or type(data) ~= "table" then return data end
+    pcall(surface, data)
+    if type(data.lines) == "table" then
+        for _, line in ipairs(data.lines) do pcall(surface, line) end
+    end
+    return data
+end
+
+--- An item's tooltip as { lines = { { leftText }, ... } }: the client's own
+--- tooltip data when it has C_TooltipInfo, else read off the hidden
+--- tooltip. Nil when neither can say. `item` is a link or an item ID.
+function Items.TooltipData(item)
+    local data
+    if type(item) == "string" then
+        data = Call({ "C_TooltipInfo.GetHyperlink" }, item)
+        if type(data) ~= "table" then
+            local itemID = tonumber(item:match("item:(%d+)"))
+            if itemID then data = Call({ "C_TooltipInfo.GetItemByID" }, itemID) end
+        end
+    elseif tonumber(item) then
+        data = Call({ "C_TooltipInfo.GetItemByID" }, tonumber(item))
+    end
+    if type(data) == "table" then return Surface(data) end
+    if Resolve("C_TooltipInfo.GetHyperlink") or Resolve("C_TooltipInfo.GetItemByID") then return nil end
+    return Items.ScanTooltip(item)
+end
+
 --- What one tooltip line says, inside a pcall: in an instance the text can
 --- be a secret value that raises when read.
 local function LineText(line)
     local ok, text = pcall(function()
         if type(line) ~= "table" then return nil end
         local left = line.leftText
+        if type(left) ~= "string" and type(line.args) == "table" then
+            for _, arg in ipairs(line.args) do
+                if type(arg) == "table" and arg.field == "leftText" and type(arg.stringVal) == "string" then
+                    left = arg.stringVal
+                    break
+                end
+            end
+        end
         if type(left) ~= "string" then return nil end
-        return left .. ""
+        -- Colour codes off, so "|cffffffff+3 Agility|r" reads as "+3 Agility".
+        left = left:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        return (left:gsub("^%s+", ""):gsub("%s+$", ""))
     end)
     return ok and text or nil
 end
@@ -224,7 +259,9 @@ local function RollPatterns()
         local format = _G[key]
         local list = {}
         if type(format) == "string" and format:find("%%") then
-            local pattern = format:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
+            -- Every magic character escaped, "%" first among them, then the
+            -- format's %c (the sign) and %d or %s (the amount) made captures.
+            local pattern = format:gsub("([%%%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
             pattern = pattern:gsub("%%%%c", "([%%+%%-])"):gsub("%%%%[ds]", "(%%d+)")
             list[#list + 1] = "^" .. pattern .. "$"
         end
@@ -252,22 +289,79 @@ end
 
 local rollStatCache = {}
 
+-- The stat lines among a tooltip's lines, as ITEM_MOD_* keys, and how
+-- many lines could be read at all.
+local function StatsFromLines(lines)
+    local found, read = {}, 0
+    if type(lines) ~= "table" then return found, read end
+    for _, line in ipairs(lines) do
+        local text = LineText(line)
+        if text then read = read + 1 end
+        local key, amount = Items.StatLine(text)
+        if key then found[key] = (found[key] or 0) + amount end
+    end
+    return found, read
+end
+
+-- How the last roll was read, for /beq probe: "tooltip data", "hidden
+-- tooltip", "shown tooltip" or "none", with the lines read.
+Items.rollRead = { how = "none", lines = 0 }
+
 --- The primary stats a rolled link's tooltip shows, as ITEM_MOD_* keys,
 --- or nil while the tooltip can't be read. On Era the game's stats for a
---- link leave out what its roll adds, so the tooltip is read for them.
+--- link leave out what its roll adds, so the tooltip is read for them:
+--- the client's tooltip data first, then our own hidden tooltip.
 function Items:TooltipStats(link)
     local known = rollStatCache[link]
     if known then return known end
+    local readAny = false
     local data = Items.TooltipData(link)
-    if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
-    local found, lines = {}, 0
-    for _, line in ipairs(data.lines) do
-        lines = lines + 1
-        local key, amount = Items.StatLine(LineText(line))
-        if key then found[key] = (found[key] or 0) + amount end
+    if type(data) == "table" then
+        local found, read = StatsFromLines(data.lines)
+        Items.rollRead = { how = "tooltip data", lines = read }
+        if next(found) then
+            rollStatCache[link] = found
+            return found
+        end
+        readAny = read > 1
     end
-    if lines > 1 then rollStatCache[link] = found end
-    return found
+    local scanned = Items.ScanTooltip(link)
+    if type(scanned) == "table" then
+        local found, read = StatsFromLines(scanned.lines)
+        Items.rollRead = { how = "hidden tooltip", lines = read }
+        if next(found) then
+            rollStatCache[link] = found
+            return found
+        end
+        readAny = readAny or read > 1
+    end
+    if readAny then return {} end
+    return nil
+end
+
+--- Note what a tooltip on screen shows for a rolled link, so the stats
+--- it lists are counted even when no other read gave them. True when it
+--- found any.
+function Items:NoteShownTooltip(link, tooltip)
+    link = self.PlainLink(link)
+    if not link or not Items.RollID(link) or rollStatCache[link] then return false end
+    local ok, lines = pcall(function()
+        local name = tooltip:GetName()
+        if type(name) ~= "string" then return nil end
+        local found = {}
+        for i = 1, tooltip:NumLines() or 0 do
+            local left = _G[name .. "TextLeft" .. i]
+            local text = left and left:GetText()
+            found[#found + 1] = { leftText = type(text) == "string" and text or nil }
+        end
+        return found
+    end)
+    if not ok then return false end
+    local found, read = StatsFromLines(lines)
+    if not next(found) then return false end
+    rollStatCache[link] = found
+    Items.rollRead = { how = "shown tooltip", lines = read }
+    return true
 end
 
 --- The raw stats table for a link (ITEM_MOD_* keys), or nil.
