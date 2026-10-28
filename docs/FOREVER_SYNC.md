@@ -22,3 +22,6 @@ Brought over one at a time since:
   Blackthornes, 2026-10-26), with Classic's own recipients; see "Sending
   vendors and quests to Blackthornes goes to Era characters" in
   `docs/CLASSIC_DIFFERENCES.md`.
+- `c281a6e` One minimap button for every Blackthornes addon (2026-10-28,
+  Forever PR #261, cherry-picked as it is; `UI/SharedMinimap.lua` and its test
+  are the same in all five Classic repos).
