@@ -98,16 +98,6 @@ function Items:Info(link)
     }
 end
 
---- The raw stats table for a link (ITEM_MOD_* keys), or nil.
-function Items:Stats(link)
-    link = self.PlainLink(link)
-    if not link then return nil end
-
-    local stats = Call(ITEM_STATS, link)
-    if type(stats) == "table" then return stats end
-    return nil
-end
-
 --------------------------------------------------------------------------------
 -- Spell damage for one school ("Increases damage done by Frost spells and
 -- effects by up to 10.")
@@ -194,6 +184,111 @@ local function LineText(line)
         return left .. ""
     end)
     return ok and text or nil
+end
+
+--- The random roll a link carries ("of the Monkey"), its eighth field, or
+--- nil for none.
+function Items.RollID(link)
+    if type(link) ~= "string" then return nil end
+    local itemString = link:match("item:[%-%d:]*")
+    if not itemString then return nil end
+    local field = 0
+    for value in (itemString .. ":"):gmatch("([^:]*):") do
+        field = field + 1
+        if field == 8 then
+            local roll = tonumber(value)
+            if roll and roll ~= 0 then return roll end
+            return nil
+        end
+    end
+    return nil
+end
+
+-- The stats a random roll can add, as the tooltip shows them.
+local ROLL_STATS = {
+    "ITEM_MOD_STRENGTH", "ITEM_MOD_AGILITY", "ITEM_MOD_STAMINA",
+    "ITEM_MOD_INTELLECT", "ITEM_MOD_SPIRIT",
+}
+local ENGLISH_ROLL_STATS = {
+    ITEM_MOD_STRENGTH = "Strength", ITEM_MOD_AGILITY = "Agility", ITEM_MOD_STAMINA = "Stamina",
+    ITEM_MOD_INTELLECT = "Intellect", ITEM_MOD_SPIRIT = "Spirit",
+}
+
+-- "+3 Agility" read as a pattern from the client's own words for it
+-- ("%c%d Agility"), else the English.
+local rollPatterns
+local function RollPatterns()
+    if rollPatterns then return rollPatterns end
+    rollPatterns = {}
+    for _, key in ipairs(ROLL_STATS) do
+        local format = _G[key]
+        local list = {}
+        if type(format) == "string" and format:find("%%") then
+            local pattern = format:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
+            pattern = pattern:gsub("%%%%c", "([%%+%%-])"):gsub("%%%%[ds]", "(%%d+)")
+            list[#list + 1] = "^" .. pattern .. "$"
+        end
+        list[#list + 1] = "^([%+%-])(%d+) " .. ENGLISH_ROLL_STATS[key] .. "$"
+        rollPatterns[#rollPatterns + 1] = { key = key .. "_SHORT", patterns = list }
+    end
+    return rollPatterns
+end
+
+--- One tooltip line as a stat and amount ("+3 Agility" is
+--- ITEM_MOD_AGILITY_SHORT, 3), or nil for any other line.
+function Items.StatLine(text)
+    if type(text) ~= "string" then return nil end
+    for _, each in ipairs(RollPatterns()) do
+        for _, pattern in ipairs(each.patterns) do
+            local sign, amount = text:match(pattern)
+            amount = tonumber(amount)
+            if sign and amount then
+                return each.key, sign == "-" and -amount or amount
+            end
+        end
+    end
+    return nil
+end
+
+local rollStatCache = {}
+
+--- The primary stats a rolled link's tooltip shows, as ITEM_MOD_* keys,
+--- or nil while the tooltip can't be read. On Era the game's stats for a
+--- link leave out what its roll adds, so the tooltip is read for them.
+function Items:TooltipStats(link)
+    local known = rollStatCache[link]
+    if known then return known end
+    local data = Items.TooltipData(link)
+    if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
+    local found, lines = {}, 0
+    for _, line in ipairs(data.lines) do
+        lines = lines + 1
+        local key, amount = Items.StatLine(LineText(line))
+        if key then found[key] = (found[key] or 0) + amount end
+    end
+    if lines > 1 then rollStatCache[link] = found end
+    return found
+end
+
+--- The raw stats table for a link (ITEM_MOD_* keys), or nil.
+--- Gear with a random roll also counts every stat its tooltip shows, so
+--- "of the Monkey" is judged with its Agility and Stamina.
+function Items:Stats(link)
+    link = self.PlainLink(link)
+    if not link then return nil end
+
+    local stats = Call(ITEM_STATS, link)
+    if type(stats) ~= "table" then return nil end
+    if not Items.RollID(link) then return stats end
+
+    local shown = self:TooltipStats(link)
+    if not shown or next(shown) == nil then return stats end
+    local merged = {}
+    for key, value in pairs(stats) do merged[key] = value end
+    for key, amount in pairs(shown) do
+        if amount > (tonumber(merged[key]) or 0) then merged[key] = amount end
+    end
+    return merged
 end
 
 --- School spell damage on an item, as { frostDamage = 10 }, or nil when the
