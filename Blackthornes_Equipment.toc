@@ -34,6 +34,7 @@ Data\WeaponTrainers.lua
 Data\Sources.lua
 Data\QuestStarts.lua
 Data\QuestEnds.lua
+Data\NameIDs.lua
 Data\DungeonQuests.lua
 Data\DungeonDoorSpots.lua
 Data\Crafts.lua
@@ -58,6 +59,7 @@ Logic\Rolls.lua
 Logic\Finder.lua
 Logic\Tracking.lua
 Logic\Waypoints.lua
+Logic\Names.lua
 Logic\UpgradeQuest.lua
 Logic\Travel.lua
 Logic\QuestArrow.lua

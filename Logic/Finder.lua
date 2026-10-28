@@ -1115,12 +1115,24 @@ local NEED_WORDS = {
     group = L["group"], dungeon = L["dungeon"], raid = L["raid"], battleground = L["battleground"],
 }
 
+-- The game's own names, on a client in another language (Logic/Names.lua).
+-- Only the words change; the source keeps the data's names.
+local function Shown(kind, name, id)
+    local names = ns.Names
+    if not (names and name) then return name end
+    if kind == "zone" then return names:Zone(name) end
+    if kind == "quest" then return names:Quest(id, name) end
+    if kind == "item" then return names:Item(name, id) end
+    return names:NPC(name, id)
+end
+
 local function Place(source)
     if not source.zone then return nil end
+    local zone = Shown("zone", source.zone)
     if source.x and source.y then
-        return ("%s (%s, %s)"):format(source.zone, source.x, source.y)
+        return ("%s (%s, %s)"):format(zone, source.x, source.y)
     end
-    return source.zone
+    return zone
 end
 
 --- The item a quest starts from, by its ID, when the source names one.
@@ -1152,7 +1164,7 @@ end
 --- uncoloured, for text that is saved.
 function Finder:Describe(source, plain)
     if source.kind == "vendor" then
-        local text = source.name
+        local text = Shown("npc", source.name)
         local where = Place(source)
         if where then text = text .. ", " .. where end
         local price = self.Money(source.price)
@@ -1164,7 +1176,7 @@ function Finder:Describe(source, plain)
         if source.limited then text = L.Format("%s  (limited stock)", text) end
         return text
     elseif source.kind == "quest" then
-        local text = L.Format("%s (level %d)", source.title, source.questLevel or 0)
+        local text = L.Format("%s (level %d)", Shown("quest", source.title, source.questID), source.questLevel or 0)
         local need = Finder.Need(source.group)
         if need then text = text .. ", " .. (NEED_WORDS[need] or need) end
         if (source.chain or 0) > 1 then
@@ -1175,19 +1187,21 @@ function Finder:Describe(source, plain)
         local where = Place(source)
         if source.x then
             if where then
-                text = L.Format("%s, from %s in %s", text, source.name, where)
+                text = L.Format("%s, from %s in %s", text, Shown("npc", source.name), where)
             else
-                text = L.Format("%s, from %s", text, source.name)
+                text = L.Format("%s, from %s", text, Shown("npc", source.name))
             end
         else
             -- The item that starts it, in its rarity colour (plain for text
             -- that is saved).
-            local shown = plain and source.name or Items.ColorName(Finder.StartsItem(source), source.name)
+            local starts = Finder.StartsItem(source)
+            local name = Shown("item", source.name, starts)
+            local shown = plain and name or Items.ColorName(starts, name)
             text = L.Format("%s, starts from %s", text, shown)
         end
         return text
     elseif source.kind == "dungeon" then
-        local text = L.Format("%s in %s", source.name, source.dungeon)
+        local text = L.Format("%s in %s", Shown("npc", source.name), Shown("zone", source.dungeon))
         if not source.raid then
             text = text .. (" (%d-%d)"):format(source.minLevel, source.maxLevel)
         end

@@ -38,6 +38,16 @@ local function Plain(value)
     return nil
 end
 
+-- The game's own names, on a client in another language (Logic/Names.lua).
+local function Shown(kind, name, id)
+    local names = ns.Names
+    if not (names and name) then return name end
+    if kind == "zone" then return names:Zone(name) end
+    if kind == "npc" then return names:NPC(name, id) end
+    if kind == "item" then return names:Item(name, id) end
+    return names:Profession(name)
+end
+
 local function Number(value)
     local ok, copy = pcall(function() return tonumber(value) end)
     if ok then return copy end
@@ -353,7 +363,7 @@ function Crafting:MaterialsText(itemID)
     local parts, list = {}, craft.m or {}
     for i = 1, #list, 2 do
         local material = ns.Crafts.MATERIALS[list[i]]
-        local name = material and material[1] or Plain((Items.Call({ "C_Item.GetItemInfo", "GetItemInfo" }, ("item:%d"):format(list[i]))))
+        local name = material and Shown("item", material[1], list[i]) or Plain((Items.Call({ "C_Item.GetItemInfo", "GetItemInfo" }, ("item:%d"):format(list[i]))))
         -- Each name in its rarity colour, as the game shows items.
         parts[#parts + 1] = ("%d %s"):format(list[i + 1], name and Items.ColorName(list[i], name) or "?")
     end
@@ -524,8 +534,9 @@ end
 --- Where, as "Darnassus (64, 21)" or "Darnassus", or nil.
 local function Place(place)
     if not place.zone then return nil end
-    if place.x and place.y then return ("%s (%s, %s)"):format(place.zone, place.x, place.y) end
-    return place.zone
+    local zone = Shown("zone", place.zone)
+    if place.x and place.y then return ("%s (%s, %s)"):format(zone, place.x, place.y) end
+    return zone
 end
 
 --- How to learn it, in words: "learn it from Darianna in Darnassus (64,
@@ -533,26 +544,28 @@ end
 function Crafting:LearnText(learn, money, plain)
     if not learn then return nil end
     if learn.how == "start" then return L["comes with the profession"] end
+    local who = Shown("npc", learn.name)
     if learn.how == "trainer" then
         local where, cost = Place(learn), money(learn.cost)
-        if where and cost then return L.Format("learn it from %s in %s for %s", learn.name, where, cost) end
-        if where then return L.Format("learn it from %s in %s", learn.name, where) end
-        if cost then return L.Format("learn it from %s for %s", learn.name, cost) end
-        return L.Format("learn it from %s", learn.name)
+        if where and cost then return L.Format("learn it from %s in %s for %s", who, where, cost) end
+        if where then return L.Format("learn it from %s in %s", who, where) end
+        if cost then return L.Format("learn it from %s for %s", who, cost) end
+        return L.Format("learn it from %s", who)
     end
     -- The recipe is an item, so its name is in its rarity colour.
-    local recipe = learn.recipe and (plain and learn.recipe or Items.ColorName(learn.recipeID, learn.recipe))
+    local recipeName = Shown("item", learn.recipe, learn.recipeID)
+    local recipe = recipeName and (plain and recipeName or Items.ColorName(learn.recipeID, recipeName))
     if learn.how == "recipe" then
         local where, price = Place(learn), money(learn.price)
         local text
         if where and price then
-            text = L.Format("%s, sold by %s in %s for %s", recipe, learn.name, where, price)
+            text = L.Format("%s, sold by %s in %s for %s", recipe, who, where, price)
         elseif where then
-            text = L.Format("%s, sold by %s in %s", recipe, learn.name, where)
+            text = L.Format("%s, sold by %s in %s", recipe, who, where)
         elseif price then
-            text = L.Format("%s, sold by %s for %s", recipe, learn.name, price)
+            text = L.Format("%s, sold by %s for %s", recipe, who, price)
         else
-            text = L.Format("%s, sold by %s", recipe, learn.name)
+            text = L.Format("%s, sold by %s", recipe, who)
         end
         if learn.limited then text = L.Format("%s (limited stock)", text) end
         return text
@@ -560,7 +573,7 @@ function Crafting:LearnText(learn, money, plain)
     if learn.how == "drop" then
         local named = learn.named
         if named and #named > 0 and learn.drops <= 3 then
-            return L.Format("%s, dropped by %s", recipe, named[1])
+            return L.Format("%s, dropped by %s", recipe, Shown("npc", named[1]))
         end
         return L.Format("%s, a world drop", recipe)
     end
@@ -571,7 +584,7 @@ end
 --- copper into coloured coins (Finder.Money).
 function Crafting:Describe(source, money, plain)
     local text
-    local profession = source.profession or L["a profession"]
+    local profession = Shown("profession", source.profession) or L["a profession"]
     if source.state == "known" then
         text = L.Format("You can make it (%s)", profession)
     elseif source.state == "learn" then
@@ -618,7 +631,7 @@ function Crafting:TooltipLine(itemID)
     plan.level = 60
     local source = self:SourceFor(itemID, plan, ns.Finder.Band)
     if not source then return nil end
-    local profession = source.profession or L["a profession"]
+    local profession = Shown("profession", source.profession) or L["a profession"]
     if source.state == "known" then return L["You can make this"], "upgrade" end
     if source.state == "alt" then return L.Format("%s can make this", Who(source.who)), "upgrade" end
     if source.state == "learn" then

@@ -313,8 +313,12 @@ function WeaponSkills:ShowMaster(link)
         ns.Print(L["no weapon master to show for that."])
         return false
     end
-    local where = place.x and ("%s (%.0f, %.0f)"):format(place.zone, place.x, place.y) or place.zone
-    ns.Print(L.Format("%s teaches %s, in %s.", place.name, place.skill, where))
+    -- The game's own names on a client in another language; the arrow keeps the data's.
+    local names = ns.Names
+    local zone = names and names:Zone(place.zone) or place.zone
+    local who = names and names:NPC(place.name) or place.name
+    local where = place.x and ("%s (%.0f, %.0f)"):format(zone, place.x, place.y) or zone
+    ns.Print(L.Format("%s teaches %s, in %s.", who, place.skill, where))
     local arrow = ns.QuestArrow
     if arrow and arrow.AimAtQuest then
         pcall(arrow.AimAtQuest, arrow, nil, L.Format("Learn %s", place.skill),

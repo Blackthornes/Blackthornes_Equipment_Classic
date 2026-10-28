@@ -291,10 +291,13 @@ end
 
 --- Where a quest starts, as the row's second line says it.
 function DQ.From(quest)
-    if quest.giver and quest.zone and quest.zone ~= "" then
-        return L.Format("%s, %s", quest.giver, quest.zone)
+    -- In the game's own words (Logic/Names.lua).
+    local names = ns.Names
+    local giver = quest.giver and names and names:NPC(quest.giver) or quest.giver
+    if giver and quest.zone and quest.zone ~= "" then
+        return L.Format("%s, %s", giver, names and names:Zone(quest.zone) or quest.zone)
     end
-    return quest.giver or ""
+    return giver or ""
 end
 
 --- The place it starts, for the arrow and the map pin, or nil.

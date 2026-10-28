@@ -319,6 +319,10 @@ function Probe:Run()
         local ok, text = pcall(ns.DungeonDoors.Describe, ns.DungeonDoors)
         Line("dungeon doors", ok and text or "could not read")
     end
+    if ns.Names then
+        local ok, text = pcall(ns.Names.ProbeText, ns.Names)
+        Line("names", ok and text or "could not read")
+    end
 
     local spec, why = Weights:CurrentSpec()
     Line("judged as", spec and (spec .. " (" .. why .. ")") or "no weights for this class")

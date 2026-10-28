@@ -741,6 +741,34 @@ local function At(place)
     return ""
 end
 
+-- The game's own names, on a client in another language (Logic/Names.lua).
+-- Only the words change: every place and check keeps the data's names.
+local function ZoneName(name)
+    local names = ns.Names
+    return names and names:Zone(name) or name
+end
+
+local function NPCName(name, kind)
+    local names = ns.Names
+    if kind == "object" or not names then return name end
+    return names:NPC(name)
+end
+
+local function QuestName(questID, title)
+    local names = ns.Names
+    return names and names:Quest(questID, title) or title
+end
+
+local function ItemName(name, id)
+    local names = ns.Names
+    return names and names:Item(name, id) or name
+end
+
+local function ProfessionName(name)
+    local names = ns.Names
+    return names and names:Profession(name) or name
+end
+
 --- Where to get the item that starts a quest (Data/QuestStarts.lua), for a
 --- quest that starts from an item rather than a person: { itemID, item,
 --- total, places }, each place { kind, name, zone, x, y, low, high, chance,
@@ -858,27 +886,29 @@ UpgradeQuest.LogObjectives = LogObjectives
 
 --- "to Morin Cloudstalker in Mulgore (51.9, 59.6)", "at" for an object.
 local function HandText(hand, withZone)
+    local who, zone = NPCName(hand.name, hand.kind), ZoneName(hand.zone)
     if hand.kind == "object" then
-        if withZone then return L.Format("at %s in %s%s", hand.name, hand.zone, At(hand)) end
-        return L.Format("at %s%s", hand.name, At(hand))
+        if withZone then return L.Format("at %s in %s%s", who, zone, At(hand)) end
+        return L.Format("at %s%s", who, At(hand))
     end
-    if withZone then return L.Format("to %s in %s%s", hand.name, hand.zone, At(hand)) end
-    return L.Format("to %s%s", hand.name, At(hand))
+    if withZone then return L.Format("to %s in %s%s", who, zone, At(hand)) end
+    return L.Format("to %s%s", who, At(hand))
 end
 
 --- What to do for a quest's objective: "collect Fizsprocket's Clipboard
 --- from Supervisor Fizsprocket in Mulgore (64.9, 43.3)".
 local function GoalText(goal)
-    local where = goal.dungeon and L.Format(" in %s", goal.dungeon)
-        or L.Format(" in %s", goal.zone) .. At(goal)
+    local where = goal.dungeon and L.Format(" in %s", ZoneName(goal.dungeon))
+        or L.Format(" in %s", ZoneName(goal.zone)) .. At(goal)
+    local who = NPCName(goal.name, goal.kind)
     if goal.item then
         -- The data names the item without its ID: coloured once the
         -- client knows the name, else as it is.
-        local item = Items.ColorName(nil, goal.item)
-        if goal.kind == "vendor" then return L.Format("buy %s from %s%s", item, goal.name, where) end
-        return L.Format("collect %s from %s%s", item, goal.name, where)
+        local item = Items.ColorName(nil, ItemName(goal.item))
+        if goal.kind == "vendor" then return L.Format("buy %s from %s%s", item, who, where) end
+        return L.Format("collect %s from %s%s", item, who, where)
     end
-    return L.Format("find %s%s", goal.name, where)
+    return L.Format("find %s%s", who, where)
 end
 
 --- A place for the map and the arrow, as the other steps carry it.
@@ -907,6 +937,7 @@ end
 
 local function Who(names)
     if type(names) ~= "table" or #names == 0 then return L["An alt"] end
+    -- Character names, never translated.
     if #names == 1 then return names[1] end
     return L.Format("%s or %s", names[1], names[2])
 end
@@ -935,7 +966,7 @@ function UpgradeQuest:Steps(quest)
 
     local function Travel(where)
         if where and where.zone then
-            Add(L.Format("Travel to %s", where.zone), zone == where.zone, { zone = where.zone, name = where.zone })
+            Add(L.Format("Travel to %s", ZoneName(where.zone)), zone == where.zone, { zone = where.zone, name = where.zone })
             -- Standing in the zone says nothing about the steps before it.
             steps[#steps].soft = true
         end
@@ -945,9 +976,10 @@ function UpgradeQuest:Steps(quest)
     -- place the data gives, Forever's before Classic's), then using it.
     -- With the item in the bags, only the using is left.
     local function StartFromItem(questID, title, itemName, started, travel, lead)
-        title = title or L["the quest"]
+        title = title and QuestName(questID, title) or L["the quest"]
         local starter = questID and UpgradeQuest.Starter(questID)
-        itemName = (starter and starter.item) or itemName or L["an item"]
+        itemName = (starter and starter.item) or itemName
+        itemName = itemName and ItemName(itemName, starter and starter.itemID) or L["an item"]
         -- The item that starts it, in its rarity colour.
         itemName = Items.ColorName(starter and starter.itemID, itemName)
         local held = starter and UpgradeQuest.Count(starter.itemID) > 0
@@ -966,8 +998,8 @@ function UpgradeQuest:Steps(quest)
                 place = { zone = first.zone, x = first.x, y = first.y, name = first.name }
             end
             if travel then Travel(place) end
-            local where = first.kind == "boss" and L.Format(" in %s", first.zone)
-                or L.Format(" in %s", first.zone) .. At(first)
+            local where = first.kind == "boss" and L.Format(" in %s", ZoneName(first.zone))
+                or L.Format(" in %s", ZoneName(first.zone)) .. At(first)
             local notes = { lead }
             if first.kind == "boss" then
                 notes[#notes + 1] = first.zone == first.door and L["Bring a group."] or L["A dungeon boss, so bring a group."]
@@ -979,16 +1011,20 @@ function UpgradeQuest:Steps(quest)
                 notes[#notes + 1] = L.Format("A %s%% drop.", tostring(chance))
             end
             local others = {}
-            for index = 2, #starter.places do others[#others + 1] = starter.places[index].name end
+            for index = 2, #starter.places do
+                local other = starter.places[index]
+                others[#others + 1] = NPCName(other.name, other.kind)
+            end
             if #others > 0 then
                 local more = starter.total - #starter.places
                 local names = table.concat(others, L[" and "])
                 notes[#notes + 1] = more > 0 and L.Format("Also from %s and %d more.", names, more)
                     or L.Format("Also from %s.", names)
             end
+            local from = first.name and NPCName(first.name, first.kind) or "?"
             local text = first.kind == "vendor"
-                and L.Format("Buy %s from %s%s%s", itemName, first.name or "?", LevelText(first), where)
-                or L.Format("Get %s from %s%s%s", itemName, first.name or "?", LevelText(first), where)
+                and L.Format("Buy %s from %s%s%s", itemName, from, LevelText(first), where)
+                or L.Format("Get %s from %s%s%s", itemName, from, LevelText(first), where)
             Add(text, false, place, table.concat(notes, " "))
             lead = nil
         end
@@ -998,7 +1034,7 @@ function UpgradeQuest:Steps(quest)
     if source.kind == "vendor" then
         local place = { zone = source.zone, x = source.x, y = source.y, name = source.name }
         Travel(place)
-        local text = L.Format("Find %s%s", source.name or L["the vendor"], At(place))
+        local text = L.Format("Find %s%s", source.name and NPCName(source.name) or L["the vendor"], At(place))
         Add(text, false, place)
         -- What a merchant window showed on Forever beats the Classic price
         -- saved with the quest.
@@ -1027,7 +1063,8 @@ function UpgradeQuest:Steps(quest)
         local chain, unknown = {}, nil
         if questID and ns.Finder then chain, unknown = ns.Finder:Chain(questID) end
         local count = #chain + (unknown and 1 or 0)
-        local lead = count > 1 and L.Format("%d quests to do before %s.", count, source.title or L["it"]) or nil
+        local sourceTitle = source.title and QuestName(questID, source.title)
+        local lead = count > 1 and L.Format("%d quests to do before %s.", count, sourceTitle or L["it"]) or nil
         if unknown then
             local after = chain[1] and chain[1].questID or questID
             Add(L.Format("Do %s", unknown), OnQuest(after), nil,
@@ -1037,15 +1074,17 @@ function UpgradeQuest:Steps(quest)
         for index, before in ipairs(chain) do
             if index > CHAIN_SHOWN then
                 local rest = #chain - CHAIN_SHOWN
-                local upTo = chain[#chain].title or L["it"]
+                local last = chain[#chain]
+                local upTo = last.title and QuestName(last.questID, last.title) or L["it"]
                 Add(rest == 1 and L.Format("Then %d more quest in the chain, up to %s", rest, upTo)
                     or L.Format("Then %d more quests in the chain, up to %s", rest, upTo), false, nil,
-                    L.Format("The quests come one after another, and %s opens once they're done.", source.title or L["the quest"]))
+                    L.Format("The quests come one after another, and %s opens once they're done.", sourceTitle or L["the quest"]))
                 break
             end
             local spot = before.x and { zone = before.zone, x = before.x, y = before.y, name = before.name } or nil
             local text, turnIn
             local note = lead
+            local beforeTitle = QuestName(before.questID, before.title)
             lead = nil
             if OnQuest(before.questID) then
                 -- In the log: the giver is behind the player. Send them to
@@ -1054,9 +1093,9 @@ function UpgradeQuest:Steps(quest)
                 local ender = UpgradeQuest.Ender(before.questID) or {}
                 local hand = ender.hand
                 local goal = ender.goal and UpgradeQuest.OpenGoal(ender, LogObjectives(before.questID))
-                local title = L.Format("%s (level %d)", before.title, before.questLevel or 0)
+                local title = L.Format("%s (level %d)", beforeTitle, before.questLevel or 0)
                 if hand and QuestReady(before.questID) then
-                    text = L.Format("Hand in %s %s", before.title, HandText(hand, true))
+                    text = L.Format("Hand in %s %s", beforeTitle, HandText(hand, true))
                     spot = Spot(hand)
                     turnIn = true
                 elseif goal then
@@ -1078,9 +1117,11 @@ function UpgradeQuest:Steps(quest)
                 local again = index > 1 and chain[index - 1].title == before.title
                 text = again
                     and L.Format("Then do the next part of %s: pick it up from %s in %s%s",
-                        before.title, before.name or "?", before.zone or "?", At(spot))
+                        beforeTitle, before.name and NPCName(before.name) or "?",
+                        before.zone and ZoneName(before.zone) or "?", At(spot))
                     or L.Format("Do %s: pick it up from %s in %s%s",
-                        before.title, before.name or "?", before.zone or "?", At(spot))
+                        beforeTitle, before.name and NPCName(before.name) or "?",
+                        before.zone and ZoneName(before.zone) or "?", At(spot))
             end
             local need = NEED_NOTES[before.group]
             if need then note = (note and note .. " " or "") .. need end
@@ -1097,7 +1138,8 @@ function UpgradeQuest:Steps(quest)
         local place = source.x and { zone = source.zone, x = source.x, y = source.y, name = source.name } or nil
         if place then Travel(place) end
         if place then
-            Add(L.Format("Pick up %s from %s%s", source.title or L["the quest"], source.name or "?", At(place)),
+            Add(L.Format("Pick up %s from %s%s", sourceTitle or L["the quest"],
+                source.name and NPCName(source.name) or "?", At(place)),
                 onQuest, place)
         else
             StartFromItem(questID, source.title, source.name, onQuest, true)
@@ -1111,9 +1153,9 @@ function UpgradeQuest:Steps(quest)
         local goal = ender.goal
         if goal and onQuest then goal = UpgradeQuest.OpenGoal(ender, LogObjectives(questID)) end
         local complete = goal
-            and L.Format("Complete %s (level %d): %s", source.title or L["the quest"], source.questLevel or 0,
+            and L.Format("Complete %s (level %d): %s", sourceTitle or L["the quest"], source.questLevel or 0,
                 GoalText(goal))
-            or L.Format("Complete %s (level %d)", source.title or L["the quest"], source.questLevel or 0)
+            or L.Format("Complete %s (level %d)", sourceTitle or L["the quest"], source.questLevel or 0)
         Add(complete, questID and QuestReady(questID), Spot(goal), note)
         if onQuest then steps[#steps].questID = questID end
         -- A reward given outright comes with the quest; only one of a
@@ -1137,16 +1179,16 @@ function UpgradeQuest:Steps(quest)
         if door and door.zone ~= source.dungeon then Travel(door) end
         local range = (not source.raid and source.minLevel)
             and L.Format(" (levels %d to %d)", source.minLevel, source.maxLevel or source.minLevel) or ""
-        local dungeon = source.dungeon or L["the dungeon"]
+        local dungeon = source.dungeon and ZoneName(source.dungeon) or L["the dungeon"]
         Add(source.raid and L.Format("Gather a raid and enter %s%s", dungeon, range)
             or L.Format("Gather a group and enter %s%s", dungeon, range),
             zone == source.dungeon, door)
         local note = source.chance
             and L.Format("It's a %s%% drop, so it can take a few runs.", tostring(source.chance)) or nil
-        Add(L.Format("Defeat %s and loot %s", source.name or L["the boss"], link), have, nil, note)
+        Add(L.Format("Defeat %s and loot %s", source.name and NPCName(source.name) or L["the boss"], link), have, nil, note)
     elseif source.kind == "craft" then
         local crafting = ns.Crafting
-        local profession = source.profession or L["the profession"]
+        local profession = source.profession and ProfessionName(source.profession) or L["the profession"]
         local learn = source.learn
         local place = source.zone and { zone = source.zone, x = source.x, y = source.y, name = source.name } or nil
         local craft = ns.Crafts and ns.Crafts.ITEMS[itemID]

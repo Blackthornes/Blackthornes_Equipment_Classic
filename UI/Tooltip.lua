@@ -236,11 +236,14 @@ function Tooltip.DropLine(itemID)
             local where = boss and DungeonName(boss[2])
             local rate = tonumber(drops[i + 1]) or 0
             if where and (not best or rate > bestRate) then
-                best, bestRate = { boss[1], where }, rate
+                best, bestRate = { boss[1], where, drops[i] }, rate
             end
         end
     end
     if not best then return nil end
+    -- In the game's own words (Logic/Names.lua).
+    local names = ns.Names
+    if names then return L.Format("Drops from %s in %s", names:NPC(best[1], best[3]), names:Zone(best[2])) end
     return L.Format("Drops from %s in %s", best[1], best[2])
 end
 

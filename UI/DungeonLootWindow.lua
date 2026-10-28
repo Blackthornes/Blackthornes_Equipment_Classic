@@ -138,12 +138,14 @@ end
 --- The line under the dungeon's name: where its door is and its levels.
 function DLUI.Where(dungeon)
     local zone = dungeon.door
-    if not dungeon.low then return zone and L.Format("Door in %s.", zone) or "" end
+    -- In the game's own words (Logic/Names.lua); CITIES knows the data's.
+    local shown = zone and ns.Names and ns.Names:Zone(zone) or zone
+    if not dungeon.low then return zone and L.Format("Door in %s.", shown) or "" end
     if not zone then return Levels(dungeon) .. "." end
     if ns.DungeonQuests.CITIES[zone] then
-        return L.Format("%s. Levels %d to %d.", zone, dungeon.low, dungeon.high or dungeon.low)
+        return L.Format("%s. Levels %d to %d.", shown, dungeon.low, dungeon.high or dungeon.low)
     end
-    return L.Format("Door in %s. Levels %d to %d.", zone, dungeon.low, dungeon.high or dungeon.low)
+    return L.Format("Door in %s. Levels %d to %d.", shown, dungeon.low, dungeon.high or dungeon.low)
 end
 
 --- The foot's line: how many show and how many are upgrades.
@@ -520,7 +522,7 @@ function DLUI:FillDungeons()
         row.dungeon = dungeon
         if dungeon then
             local on = picked ~= nil and dungeon.key == picked.key
-            row.name:SetText(dungeon.name)
+            row.name:SetText(ns.Names and ns.Names:Zone(dungeon.name) or dungeon.name)
             row.name:SetTextColor(Theme.Unpack(on and "accentHi" or "text"))
             row.levels:SetText(Levels(dungeon))
             SetPicked(row, on)
@@ -533,7 +535,7 @@ end
 
 function DLUI:FillList()
     local dungeon = self:Picked()
-    self.dungeonName:SetText(dungeon and dungeon.name or "")
+    self.dungeonName:SetText(dungeon and (ns.Names and ns.Names:Zone(dungeon.name) or dungeon.name) or "")
     self.dungeonWhere:SetText(dungeon and DLUI.Where(dungeon) or "")
     local rows = ns.DungeonLoot.SortRows(self.data.rows, self.sortKey, self.sortFlip)
     for index, row in ipairs(self.rows) do
@@ -546,7 +548,7 @@ function DLUI:FillList()
             if r then row.name:SetTextColor(r, g, b) else row.name:SetTextColor(Theme.Unpack("text")) end
             row.name:SetText(name)
             row.slot:SetText(line.slot)
-            row.boss:SetText(line.boss)
+            row.boss:SetText(ns.Names and ns.Names:NPC(line.boss) or line.boss)
             if line.gain then
                 row.gain:SetText(("%+d%%"):format(line.gain))
             elseif line.upgrade then

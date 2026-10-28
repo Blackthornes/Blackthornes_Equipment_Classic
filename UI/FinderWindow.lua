@@ -246,6 +246,8 @@ end
 --- nearby).
 function FinderUI.MarkZone(text, zone)
     if not (zone and text) or zone == "" then return text end
+    -- The text names zones in the game's own words (Logic/Names.lua).
+    if ns.Names then zone = ns.Names:Zone(zone) end
     local pattern = "%f[%w]" .. zone:gsub("[%%%^%$%(%)%.%[%]%*%+%-%?]", "%%%0") .. "%f[%W]"
     return (text:gsub(pattern, function(found) return Colored("good", found) end))
 end
@@ -295,8 +297,11 @@ local function ShowEnchantTooltip(row, line)
     local place = (source and (source.state == "learn" or source.state == "skill"))
         and Enchants:WhereToLearn(pick.recipeID)
     if place and place.name then
-        local where = place.zone and L.Format("Learn it from %s in %s", place.name, place.zone)
-            or L.Format("Learn it from %s", place.name)
+        local names = ns.Names
+        local who = names and names:NPC(place.name) or place.name
+        local zone = place.zone and names and names:Zone(place.zone) or place.zone
+        local where = zone and L.Format("Learn it from %s in %s", who, zone)
+            or L.Format("Learn it from %s", who)
         GameTooltip:AddLine(where, r, g, b, true)
     end
     GameTooltip:Show()
@@ -1645,9 +1650,16 @@ end
 function FinderUI.WhereOf(line)
     local source = line.sources and line.sources[1]
     if not source then return nil end
-    if source.kind == "dungeon" then return source.dungeon or source.zone end
-    if source.kind == "craft" then return source.profession end
-    return source.zone
+    -- In the game's own words (Logic/Names.lua).
+    local names = ns.Names
+    if source.kind == "dungeon" then
+        local where = source.dungeon or source.zone
+        return names and names:Zone(where) or where
+    end
+    if source.kind == "craft" then
+        return names and names:Profession(source.profession) or source.profession
+    end
+    return names and names:Zone(source.zone) or source.zone
 end
 
 --- A pick's name, for sorting.

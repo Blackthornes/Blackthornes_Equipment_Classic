@@ -98,12 +98,14 @@ end
 --- The line under the dungeon's name on the right.
 function DQUI.Where(dungeon)
     local zone = dungeon.door
-    if not dungeon.low then return zone or "" end
+    -- In the game's own words (Logic/Names.lua); CITIES knows the data's.
+    local shown = zone and ns.Names and ns.Names:Zone(zone) or zone
+    if not dungeon.low then return shown or "" end
     if not zone then return Levels(dungeon) .. "." end
     if ns.DungeonQuests.CITIES[zone] then
-        return L.Format("%s. Levels %d to %d.", zone, dungeon.low, dungeon.high or dungeon.low)
+        return L.Format("%s. Levels %d to %d.", shown, dungeon.low, dungeon.high or dungeon.low)
     end
-    return L.Format("Door in %s. Levels %d to %d.", zone, dungeon.low, dungeon.high or dungeon.low)
+    return L.Format("Door in %s. Levels %d to %d.", shown, dungeon.low, dungeon.high or dungeon.low)
 end
 
 --------------------------------------------------------------------------------
@@ -469,7 +471,7 @@ function DQUI:FillDungeons()
         row.dungeon = dungeon
         if dungeon then
             local on = picked ~= nil and dungeon.key == picked.key
-            row.name:SetText(dungeon.name)
+            row.name:SetText(ns.Names and ns.Names:Zone(dungeon.name) or dungeon.name)
             row.name:SetTextColor(Theme.Unpack(on and "accentHi" or "text"))
             row.levels:SetText(Levels(dungeon))
             row.count:SetText(("%d/%d"):format(dungeon.done, dungeon.all))
@@ -522,7 +524,7 @@ function DQUI:FillQuests()
         self.dungeonCount:SetText("")
         self.empty:SetText(L["Pick a quest to see where it starts."])
     else
-        self.dungeonName:SetText(dungeon.name)
+        self.dungeonName:SetText(ns.Names and ns.Names:Zone(dungeon.name) or dungeon.name)
         self.dungeonWhere:SetText(DQUI.Where(dungeon))
         self.dungeonCount:SetText(("%d/%d"):format(dungeon.done, dungeon.all))
         self.empty:SetText("")

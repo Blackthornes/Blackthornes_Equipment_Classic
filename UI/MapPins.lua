@@ -94,10 +94,12 @@ function MapPins:HuntsOn(zone)
     local quest = ns.UpgradeQuest and ns.UpgradeQuest:IsEnabled() and ns.UpgradeQuest:Current()
     local spot = quest and ns.UpgradeQuest:NextPlace()
     if spot and spot.zone == zone and spot.x and spot.y then
+        local names = ns.Names
+        local shown = spot.name and names and names:NPC(names:Zone(spot.name)) or spot.name
         list[#list + 1] = {
             link = quest.link, quest = true,
             place = { zone = spot.zone, x = spot.x, y = spot.y, name = spot.name,
-                text = spot.name and L.Format("Upgrade quest: go to %s", spot.name) or L["Upgrade quest"] },
+                text = shown and L.Format("Upgrade quest: go to %s", shown) or L["Upgrade quest"] },
         }
     end
     -- The place Show on map was last asked for, where the game takes no pin
