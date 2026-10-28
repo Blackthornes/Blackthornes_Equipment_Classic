@@ -341,10 +341,14 @@ local WHY = {
 --- `link` the item it is for.
 function Waypoints:Show(place, what, link)
     local ok, why = self:Pin(place, link)
+    -- Names in the game's own words (Logic/Names.lua); the place keeps the data's.
+    local names = ns.Names
+    local zone = place and place.zone and names and names:Zone(place.zone) or (place and place.zone)
+    if what and names then what = names:NPC(names:Zone(what)) end
     if ok then
         -- `why` is the map the pin went on, which can be the one around it.
         ns.Print(L.Format("pinned %s on your map: %s (%s, %s)", what or place.name or L["it"],
-            place.zone, place.x, place.y))
+            zone, place.x, place.y))
         -- Open the map on it, where the game lets an addon. Never in a
         -- fight: the game blocks an addon opening the map then. The pin
         -- stays, so the map shows it when opened after the fight.
@@ -361,7 +365,7 @@ function Waypoints:Show(place, what, link)
             -- A whole sentence of its own: no place would help.
             ns.Print(reason)
         elseif place and place.zone then
-            ns.Print(L.Format("can't pin %s (%s): %s", what or L["that"], place.zone, reason))
+            ns.Print(L.Format("can't pin %s (%s): %s", what or L["that"], zone, reason))
         else
             ns.Print(L.Format("can't pin %s: %s", what or L["that"], reason))
         end

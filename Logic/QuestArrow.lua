@@ -576,16 +576,24 @@ end
 --- Where a place is, in a line: "Corina Steele, Elwynn Forest".
 function QuestArrow.Place(target, here)
     local name = target.name
-    if not name or name == target.zone then return target.zone or "?" end
+    -- The game's own names, on a client in another language; the target
+    -- keeps the data's.
+    local names = ns.Names
+    local zone = target.zone and names and names:Zone(target.zone) or target.zone
+    if not name or name == target.zone then return zone or "?" end
+    if names then name = names:NPC(names:Zone(name)) end
     if target.zone and not (here and here.zone == target.zone) then
-        return L.Format("%s, %s", name, target.zone)
+        return L.Format("%s, %s", name, zone)
     end
     return name
 end
 
 --- The note under a place: what the step is, or why there is no spot.
 function QuestArrow.Note(target)
-    if target.far then return L.Format("Far from here: head for %s", target.zone or L["it"]), "muted" end
+    if target.far then
+        local zone = target.zone and ns.Names and ns.Names:Zone(target.zone) or target.zone
+        return L.Format("Far from here: head for %s", zone or L["it"]), "muted"
+    end
     if target.here then return L["No exact spot known in this zone"], "accent" end
     if target.area then return L["The middle of the zone, since no exact spot is known"], "accent" end
     if target.forQuest then return target.forQuest, "good" end
@@ -671,14 +679,16 @@ function QuestArrow:State(clock)
     local trip = ns.Travel and ns.Travel:Use(target, here, clock)
     if trip then return self:TripState(state, trip, here) end
 
+    -- The zone in the game's own words (Logic/Names.lua).
+    local zoneShown = target.zone and ns.Names and ns.Names:Zone(target.zone) or target.zone
     if target.far then
         state.mode = "far"
-        state.distance = target.zone or L["Far away"]
+        state.distance = zoneShown or L["Far away"]
         return state
     end
     if target.here then
         state.mode = "here"
-        state.distance = L.Format("In %s", target.zone or L["this zone"])
+        state.distance = L.Format("In %s", zoneShown or L["this zone"])
         return state
     end
 
@@ -686,7 +696,7 @@ function QuestArrow:State(clock)
     local north, west = QuestArrow.Offset(here, target.map, target.mx, target.my, target)
     if not north then
         state.mode = "far"
-        state.distance = target.zone or L["Far away"]
+        state.distance = zoneShown or L["Far away"]
         return state
     end
 
@@ -704,7 +714,7 @@ function QuestArrow:State(clock)
 
     state.mode = "point"
     if target.area then
-        state.distance = L.Format("%s, %s", target.zone or "?", QuestArrow.Yards(yards))
+        state.distance = L.Format("%s, %s", zoneShown or "?", QuestArrow.Yards(yards))
     else
         state.distance = QuestArrow.Yards(yards)
     end

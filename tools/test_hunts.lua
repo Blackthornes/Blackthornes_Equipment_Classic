@@ -229,6 +229,31 @@ _G.WorldMapFrame.GetMapID = function() return 1415 end
 ns.MapPins:Draw()
 suite.check("and none on another zone's map", not ns.MapPins.pins[1]:IsShown())
 
+-- Show on map's place gets the big marker: its name under it, its light
+-- moving only with Effects on Full.
+_G.WorldMapFrame.GetMapID = function() return 1429 end
+ns.Waypoints.marked = { zone = "Elwynn Forest", x = 30, y = 40, name = "Marshal Dughan" }
+ns.MapPins:OnTrackingChanged()
+ns.MapPins:Draw()
+local marker = ns.MapPins.markers and ns.MapPins.markers[1]
+suite.check("the Show on map place gets the big marker", marker and marker.big and marker:IsShown())
+suite.check("bigger than a pin", ns.MapPins.MARK_SIZE >= 40)
+suite.check("it names the place", marker and marker.plate.text:GetText() == "Marshal Dughan",
+    marker and marker.plate.text:GetText())
+suite.check("its light moves on Full", marker and marker.moving == true)
+local mpoint = marker and marker._point
+suite.check("where it is asked", mpoint and math.abs(mpoint[4] - 300) < 1e-6 and math.abs(mpoint[5] + 240) < 1e-6,
+    mpoint and (mpoint[4] .. "," .. mpoint[5]))
+ns.Motion.SetLevel("off")
+ns.MapPins:OnTrackingChanged()
+ns.MapPins:Draw()
+suite.check("and holds still with Effects off", marker.moving == false and not marker.ripples[1]:IsShown())
+ns.Motion.SetLevel("full")
+ns.Waypoints.marked = nil
+ns.MapPins:OnTrackingChanged()
+ns.MapPins:Draw()
+suite.check("gone once nothing is marked", not marker:IsShown())
+
 --------------------------------------------------------------------------------
 -- The character sheet
 --------------------------------------------------------------------------------

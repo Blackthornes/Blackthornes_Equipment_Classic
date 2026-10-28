@@ -1245,7 +1245,7 @@ function QuestPanel:ShowOnMap()
         pcall(_G.OpenWorldMap, mapID)
         return true
     end
-    ns.Print(L.Format("head for %s.", place.zone))
+    ns.Print(L.Format("head for %s.", ns.Names and ns.Names:Zone(place.zone) or place.zone))
     return false
 end
 

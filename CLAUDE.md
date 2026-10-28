@@ -1258,6 +1258,38 @@ stay `deDE` and `Locale/deDE.lua`.
 - German runs about 30% longer: buttons grow to fit, settings rows wrap,
   and a new fixed width must wrap or grow, never end in "...".
 
+## Names in the player's language
+
+A player asked (2026-10-28) for the upgrade quest's steps to name quests,
+people, zones and items in their own language. `Logic/Names.lua`
+(`ns.Names`) turns a name the data has in English into the game's own,
+only on a client in another language and only as it goes into words: the
+data, the places, the saved quests and every check keep the English name.
+Zones by their map (`Waypoints.ZONE_MAPS`), dungeons by
+`GetRealZoneText(instanceID)`, quests by the client's title for the ID,
+creatures by a hidden tooltip on `unit:Creature-...-ID`, items by item
+info, professions by their spell. The data has names but no creature or
+item IDs, so `Data/NameIDs.lua` gives them, written by
+`tools/make_name_ids.py <mangoszero database>` (never by hand; rerun it
+after the other data tools). Objects stay English: the client cannot name
+one by its ID. Every answer is kept; a miss stays English, is asked again
+at most every `Names.RETRY` seconds, and the upgrade quest panel draws again
+once it comes in. Callers: the upgrade quest's steps, the quest arrow, the
+finder, crafting lines, the tooltip's boss line, Dungeon Quests and Dungeon
+Loot, map pins and Show the way's chat lines. `/beq probe` has a "names"
+line. Tested in `tools/test_names.lua`. Not yet seen in game.
+
+The Show on map marker (the same player asked, the owner said build it
+from a mockup, 2026-10-28): on Era the place Show on map asks for
+(`Waypoints.marked`) is Equipment's own pin, and it is now bigger than the
+hunt pins (`MapPins.MARK_SIZE`, `MapPins:MakeMarker`): the icon in dark
+glass in a gold rim, a red gem on top, a soft beam above, a glow and two
+gold ripples at its foot, and the place's name in the player's language on
+a small plate under it (`DressMarker`). Only `Media/Frame/Glow.tga`, no new
+art. The glow breathes and the ripples run only with Effects on Full, as
+looping animations the game plays itself; Subtle and Off hold still. No
+new words. Tested in `tools/test_hunts.lua`. Not yet seen in game.
+
 ## Simplified Chinese, French, Spanish and Russian
 
 The owner said yes (2026-10-18) to these four in every addon, after Pets'
