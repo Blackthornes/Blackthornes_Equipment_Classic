@@ -1133,3 +1133,9 @@ L["%d upgrades you can go and get."] = "%d améliorations que tu peux aller cher
 -- The fold gem beside a window's close gem (2026-10-24)
 L["Collapse this window"] = "Replier cette fenêtre"
 L["Expand this window"] = "Déplier cette fenêtre"
+
+-- The shared Blackthornes minimap button (2026-10-28)
+L["Click a name to open it. Right-click for its settings."] = "Clique sur un nom pour l'ouvrir. Clic droit pour ses réglages."
+L["Click to pick an addon"] = "Clique pour choisir un addon"
+L["Combine Addon Buttons:"] = "Regrouper les boutons d'addons :"
+L["Your next gear upgrades"] = "Tes prochaines améliorations d'équipement"

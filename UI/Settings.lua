@@ -816,6 +816,14 @@ function SettingsUI:BuildGeneral()
     local styleRow = pages:Row("general", 1, L["Window Style:"], "")
     controls.windowStyle = self:WindowStyleControl(styleRow)
 
+    -- One minimap button for every Blackthornes addon (UI/SharedMinimap.lua,
+    -- the owner, 2026-10-28): ticked unless unticked, the same in all five.
+    local combineRow = pages:Row("general", 1, L["Combine Addon Buttons:"], nil)
+    controls.combineButtons = Widgets.CreateCheckbox(combineRow, L["On"], function(checked)
+        if ns.SharedMinimap then ns.SharedMinimap.SetCombined(checked) end
+    end, true)
+    controls.combineButtons:SetPoint("TOPLEFT", CONTROL_X, -2)
+
     -- How much the windows move: they rise in, glow and glint at Full,
     -- only fade at Subtle and stay still at Off. Full until picked.
     pages:Section("general", 1, L["EFFECTS"])
@@ -981,6 +989,7 @@ function SettingsUI:Refresh()
 
     controls.textSize:Sync()
     controls.windowStyle:Sync()
+    controls.combineButtons:SetChecked(not ns.SharedMinimap or ns.SharedMinimap.Combined())
     controls.effects:SetValue(controls.effectsIndex(), true)
     self.pages:Refresh()
 end
