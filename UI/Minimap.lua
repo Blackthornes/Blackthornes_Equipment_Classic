@@ -193,7 +193,26 @@ function MinimapButton:Build()
     self.lastMinimapWidth = Minimap:GetWidth()
 
     self:ApplyVisibility()
+    self:JoinShared()
     return button
+end
+
+--- Sign up for the shared Blackthornes button (UI/SharedMinimap.lua).
+function MinimapButton:JoinShared()
+    if not ns.SharedMinimap or not self.button then return end
+    ns.SharedMinimap:Join({
+        key = "equipment",
+        order = 3,
+        name = "Blackthornes Equipment",
+        icon = ICON,
+        blurb = L["Your next gear upgrades"],
+        button = self.button,
+        angle = function() return (ns.db and ns.db.minimapAngle) or DEFAULT_ANGLE end,
+        open = function() MinimapButton:Open() end,
+        settings = function() if ns.SettingsUI then ns.SettingsUI:Toggle() end end,
+        shift = function() if ns.UpgradeQuest then ns.UpgradeQuest:Toggle() end end,
+        db = function() return ns.db end,
+    })
 end
 
 --- Re-seat the button at its stored angle, using the current radius.
@@ -210,7 +229,12 @@ end
 function MinimapButton:ApplyVisibility()
     local button = self.button
     if not button then return end
-    button:Show()
+    -- Folded into the shared Blackthornes button (UI/SharedMinimap.lua).
+    if ns.SharedMinimap and ns.SharedMinimap.Hides("equipment") then
+        button:Hide()
+    else
+        button:Show()
+    end
 end
 
 function MinimapButton:OnEnable()
