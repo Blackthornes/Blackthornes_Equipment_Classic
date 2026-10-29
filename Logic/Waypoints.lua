@@ -290,7 +290,7 @@ function Waypoints:Mark(place, link, mapID)
     local pins = ns.MapPins
     if not (pins and pins:IsEnabled()) then return false, "noclient" end
     self.marked = { zone = place.zone, x = place.x, y = place.y, name = place.name,
-        text = place.text, items = place.items, link = link }
+        text = place.text, items = place.items, link = link, area = place.area }
     if pins.OnTrackingChanged then pins:OnTrackingChanged() end
     return true, mapID
 end
@@ -339,12 +339,22 @@ local WHY = {
 
 --- Pin a place and say so in chat. `what` names it ("Corina Steele"),
 --- `link` the item it is for.
+---
+--- Where the game takes no pin (Era), Equipment's own marker goes on the
+--- spot (`Mark`) and the quest arrow shows the way there; the marker goes
+--- once you stand on it (UI/MapPins.lua). A place with only a zone gets a
+--- "Somewhere in ZONE" marker in the zone's middle and the arrow.
 function Waypoints:Show(place, what, link)
-    local ok, why = self:Pin(place, link)
     -- Names in the game's own words (Logic/Names.lua); the place keeps the data's.
     local names = ns.Names
     local zone = place and place.zone and names and names:Zone(place.zone) or (place and place.zone)
     if what and names then what = names:NPC(names:Zone(what)) end
+    if type(place) == "table" and place.zone and not (place.x and place.y) then
+        return self:ShowArea(place, what, zone, link)
+    end
+    local ok, why = self:Pin(place, link)
+    -- No game pin, so no game arrow: the quest arrow points there instead.
+    if ok and self.marked then self:AimArrow(place, what or place.name) end
     if ok then
         -- `why` is the map the pin went on, which can be the one around it.
         ns.Print(L.Format("pinned %s on your map: %s (%s, %s)", what or place.name or L["it"],
@@ -371,4 +381,37 @@ function Waypoints:Show(place, what, link)
         end
     end
     return ok
+end
+
+--- Never in a fight: the game blocks an addon opening the map then.
+function Waypoints.OpenMap(mapID)
+    if type(_G.InCombatLockdown) == "function" then
+        local okFight, fighting = pcall(_G.InCombatLockdown)
+        if okFight and fighting == true then return end
+    end
+    if mapID and type(_G.OpenWorldMap) == "function" then pcall(_G.OpenWorldMap, mapID) end
+end
+
+--- Point the quest arrow at a place the game took no pin for.
+function Waypoints:AimArrow(place, name)
+    local arrow = ns.QuestArrow
+    if not (arrow and arrow.AimAtQuest) then return end
+    pcall(arrow.AimAtQuest, arrow, nil, name or place.zone,
+        { zone = place.zone, x = place.x, y = place.y, name = name })
+end
+
+--- Only a zone is known: "head for ZONE." in chat, a "Somewhere in ZONE"
+--- marker in its middle, the arrow toward it, and the map opened on it.
+function Waypoints:ShowArea(place, what, zone, link)
+    local mapID = self:MapFor(place.zone)
+    if not mapID then
+        ns.Print(L.Format("can't pin %s (%s): %s", what or L["that"], zone, WHY.nomap))
+        return false
+    end
+    ns.Print(L.Format("head for %s.", zone))
+    self:Mark({ zone = place.zone, x = 50, y = 50, area = true,
+        name = L.Format("Somewhere in %s", zone) }, link, mapID)
+    self:AimArrow({ zone = place.zone }, what or zone)
+    Waypoints.OpenMap(mapID)
+    return true
 end

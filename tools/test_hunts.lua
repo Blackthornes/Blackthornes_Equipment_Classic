@@ -204,6 +204,40 @@ suite.check("no map up the line takes one: our own pin marks it", okEra == true 
     and waypoint == nil and ns.Waypoints.marked ~= nil, eraMap)
 suite.check("and the game's pin is not offered there", ns.Waypoints:GamePins(1429) == false)
 ns.Waypoints:Unmark()
+
+-- Era's Show on map: our marker, and the quest arrow shows the way.
+local aimed
+local aim = ns.QuestArrow.AimAtQuest
+ns.QuestArrow.AimAtQuest = function(_, _, title, at) aimed = { title = title, place = at }; return true end
+suite.check("Show on map with no game pin still shows", ns.Waypoints:Show(place, "Marshal Dughan") == true
+    and ns.Waypoints.marked ~= nil)
+suite.check("and the quest arrow points there", aimed and aimed.title == "Marshal Dughan"
+    and aimed.place.zone == "Elwynn Forest" and aimed.place.x == place.x)
+-- Standing on it, the marker goes; a step away it stays.
+local here, offset, measure = ns.QuestArrow.Here, ns.QuestArrow.Offset, ns.QuestArrow.Measure
+local away = 80
+ns.QuestArrow.Here = function() return { map = 1429, x = 0.42, y = 0.66 } end
+ns.QuestArrow.Offset = function() return away, 0 end
+ns.QuestArrow.Measure = function(north) return north end
+ns.MapPins.arriveSince = 0
+suite.check("it waits a moment before looking", ns.MapPins:MarkDone(0.2) == false)
+suite.check("far away it stays", ns.MapPins:MarkDone(1) == false)
+away = 5
+suite.check("standing on it, it goes", ns.MapPins:MarkDone(1) == true)
+ns.Waypoints:Unmark()
+-- Only a zone: a "Somewhere in ZONE" marker in its middle, kept.
+aimed, opened = nil, nil
+suite.check("a zone alone shows too", ns.Waypoints:Show({ zone = "Elwynn Forest" }, "the camp") == true)
+local area = ns.Waypoints.marked
+suite.check("in the zone's middle, saying so", area and area.x == 50 and area.y == 50 and area.area == true
+    and area.name == "Somewhere in Elwynn Forest", area and area.name)
+suite.check("the arrow heads for the zone", aimed and aimed.place.zone == "Elwynn Forest" and aimed.place.x == nil)
+suite.check("and the zone's map opens", opened == 1429, opened)
+suite.check("chat says to head there", env.ChatText():find("head for Elwynn Forest.", 1, true) ~= nil)
+suite.check("a zone marker never goes by itself", ns.MapPins:MarkDone(5) == false)
+ns.QuestArrow.Here, ns.QuestArrow.Offset, ns.QuestArrow.Measure = here, offset, measure
+ns.QuestArrow.AimAtQuest = aim
+ns.Waypoints:Unmark()
 _G.C_Map.CanSetUserWaypointOnMap, _G.C_Map.GetMapRectOnMap, _G.C_Map.HasUserWaypoint = nil, nil, nil
 
 -- A cave or a floor sharing the zone's name: the zone's own map wins.

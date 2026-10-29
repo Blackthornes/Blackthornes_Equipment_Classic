@@ -138,6 +138,15 @@ setting off does it still say it couldn't. A Forever change to
 `Logic/Waypoints.lua` or `UI/MapPins.lua` is a clash to blend, keeping
 `Mark`. Tested in `tools/test_hunts.lua`.
 
+Forever's `9992e47` ("Show on Map works without the game's pin") was
+blended in on 2026-10-29, on top of `Mark` rather than Forever's
+`MapPins:Spotlight`: with no game pin the quest arrow shows the way
+(`Waypoints:AimArrow`), the marker goes once you stand on it
+(`MapPins:MarkDone`, `MapPins.Reached`), and a place with only a zone gets
+a "Somewhere in ZONE" marker in the zone's middle (`Waypoints:ShowArea`,
+`marked.area`), from Show on map in the quest panel and the quest log too.
+Forever's own zones stay out of `ZONE_MAPS`.
+
 ### Talent points refresh the upgrades
 
 Forever says talents moved with `TRAIT_CONFIG_UPDATED`; Era says it with

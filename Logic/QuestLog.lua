@@ -465,13 +465,11 @@ end
 function QuestLog:ShowOnMap(quest)
     local place = QuestLog.Place(quest)
     local waypoints = ns.Waypoints
-    if place and place.x and place.y and waypoints then
-        return waypoints:Show(place, place.name or quest.title)
-    end
+    -- A spot, or only a zone ("Somewhere in ZONE"): the marker and the arrow.
     local zone = place and place.zone or quest.zone
-    local mapID = waypoints and zone and waypoints:MapFor(zone)
-    if mapID and type(_G.OpenWorldMap) == "function" and pcall(_G.OpenWorldMap, mapID) then
-        return true
+    if waypoints and zone and waypoints:MapFor(zone) then
+        local shown = place and place.zone and place or { zone = zone }
+        return waypoints:Show(shown, shown.name or quest.title)
     end
     -- The client's own way to a quest on the map.
     if quest.questID and type(_G.QuestMapFrame_OpenToQuestDetails) == "function"

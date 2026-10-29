@@ -1235,18 +1235,10 @@ end
 function QuestPanel:ShowOnMap()
     local place = ns.UpgradeQuest and ns.UpgradeQuest:NextPlace()
     if not (place and ns.Waypoints) then return false end
-    if place.x and place.y then
-        local quest = ns.UpgradeQuest:Current()
-        return ns.Waypoints:Show(place, place.name, quest and quest.link)
-    end
-    -- No exact spot, only a zone: open the map on it.
-    local mapID = ns.Waypoints:MapFor(place.zone)
-    if mapID and type(_G.OpenWorldMap) == "function" then
-        pcall(_G.OpenWorldMap, mapID)
-        return true
-    end
-    ns.Print(L.Format("head for %s.", ns.Names and ns.Names:Zone(place.zone) or place.zone))
-    return false
+    -- A spot gets the marker on it; only a zone, a "Somewhere in ZONE"
+    -- marker in its middle. Either way the arrow shows the way.
+    local quest = ns.UpgradeQuest:Current()
+    return ns.Waypoints:Show(place, place.name, quest and quest.link)
 end
 
 function QuestPanel:ToggleFold()
