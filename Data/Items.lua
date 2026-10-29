@@ -252,10 +252,33 @@ local ENGLISH_ROLL_STATS = {
 -- "+3 Agility" read as a pattern from the client's own words for it
 -- ("%c%d Agility"), else the English.
 local rollPatterns
+
+-- The stat's name as this client writes it, lower case: the game's short
+-- name, its character sheet name (SPELL_STAT1_NAME is Strength, in the
+-- ROLL_STATS order), our own translation and the English. A German "+5
+-- Stärke" is matched by name when the client's format line differs.
+local function RollNames(key, index)
+    local names = {}
+    local function Add(name)
+        local ok, copy = pcall(function()
+            if type(name) == "string" and name ~= "" and not name:find("%%") then
+                return name:lower() .. ""
+            end
+        end)
+        if ok and copy then names[copy] = true end
+    end
+    Add(_G[key .. "_SHORT"])
+    Add(_G["SPELL_STAT" .. index .. "_NAME"])
+    local L = ns.L
+    if L then Add(L[ENGLISH_ROLL_STATS[key]]) end
+    Add(ENGLISH_ROLL_STATS[key])
+    return names
+end
+
 local function RollPatterns()
     if rollPatterns then return rollPatterns end
     rollPatterns = {}
-    for _, key in ipairs(ROLL_STATS) do
+    for i, key in ipairs(ROLL_STATS) do
         local format = _G[key]
         local list = {}
         if type(format) == "string" and format:find("%%") then
@@ -266,7 +289,7 @@ local function RollPatterns()
             list[#list + 1] = "^" .. pattern .. "$"
         end
         list[#list + 1] = "^([%+%-])(%d+) " .. ENGLISH_ROLL_STATS[key] .. "$"
-        rollPatterns[#rollPatterns + 1] = { key = key .. "_SHORT", patterns = list }
+        rollPatterns[#rollPatterns + 1] = { key = key .. "_SHORT", patterns = list, names = RollNames(key, i) }
     end
     return rollPatterns
 end
@@ -275,11 +298,24 @@ end
 --- ITEM_MOD_AGILITY_SHORT, 3), or nil for any other line.
 function Items.StatLine(text)
     if type(text) ~= "string" then return nil end
+    -- A no-break space reads as a plain one.
+    text = text:gsub("\194\160", " ")
     for _, each in ipairs(RollPatterns()) do
         for _, pattern in ipairs(each.patterns) do
             local sign, amount = text:match(pattern)
             amount = tonumber(amount)
             if sign and amount then
+                return each.key, sign == "-" and -amount or amount
+            end
+        end
+    end
+    -- "+5 Stärke" by the stat's name, whatever the client's format line says.
+    local sign, amount, name = text:match("^([%+%-])%s*(%d+)%s+(.-)%s*$")
+    amount = tonumber(amount)
+    if sign and amount and name and name ~= "" then
+        name = name:lower()
+        for _, each in ipairs(RollPatterns()) do
+            if each.names[name] then
                 return each.key, sign == "-" and -amount or amount
             end
         end
