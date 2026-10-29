@@ -279,6 +279,7 @@ L["%s A new one comes up as you level. Try another tab, or click Pick one to cho
 L["Pick one"] = "挑一个"
 L["New upgrade on offer at level %d"] = "等级 %d 时有新的升级"
 L["head for %s."] = "前往%s。"
+L["Somewhere in %s"] = "%s的某处"
 L["Drag to make the panel bigger or smaller."] = "拖动可以把面板变大或变小。"
 L["Right-click to go back to normal size."] = "右键点击恢复正常大小。"
 

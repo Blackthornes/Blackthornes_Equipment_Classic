@@ -33,6 +33,18 @@ suite.check("not from the road sign", math.abs(toUndercity[4] - -4397.8) > 200, 
 suite.check("Undercity's zeppelin leaves from its tower, not the sign below",
     math.abs(shipped.docks.undercity[3] - 1981.6) > 50, shipped.docks.undercity[3])
 
+-- Every shipped flight carries how far it really goes, from its points in
+-- the tables, never shorter than the straight line between its ends.
+local shippedPaths, shippedLengths = shipped.paths, shipped.lengths or {}
+suite.check("a length for every flight", #shippedLengths * 2 == #shippedPaths, #shippedLengths)
+local short
+for index = 1, #shippedPaths - 1, 2 do
+    local a, b = shipped.flights[shippedPaths[index]], shipped.flights[shippedPaths[index + 1]]
+    local line = math.sqrt((a[4] - b[4]) ^ 2 + (a[5] - b[5]) ^ 2)
+    if (shippedLengths[(index + 1) / 2] or 0) < line then short = shippedPaths[index] .. "-" .. shippedPaths[index + 1] end
+end
+suite.check("none shorter than a straight line", short == nil, short)
+
 local DATA = Travel.DATA
 DATA.flights = {
     [1] = { "Stormwind, Elwynn", "A", 0, 0, -200, "Elwynn" },
@@ -44,6 +56,7 @@ DATA.docks = {
     theramore = { "Theramore", 1, -3000, -3000, "Dustwallow Marsh" },
 }
 DATA.rides = { { "menethil", "theramore", "boat", "A" } }
+DATA.lengths = nil
 
 local here = { map = 1429, x = 0.5, y = 0.5, continent = 0, north = 0, west = 0, zone = "Elwynn Forest" }
 local place = { continent = 1, north = -3200, west = -3000, zone = "Dustwallow Marsh", name = "Mirefin camp" }

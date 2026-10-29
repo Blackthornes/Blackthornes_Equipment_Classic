@@ -445,10 +445,46 @@ function MapPins:OnTrackingChanged()
     self.key = nil
 end
 
+-- How often the Show on map marker looks whether you reached it.
+MapPins.ARRIVE_LOOK = 1
+
+--- The Show on map marker goes once you stand within QuestArrow.ARRIVED
+--- yards of it, looked at about once a second. A "Somewhere in ZONE"
+--- marker stays until the next Show on map.
+function MapPins:MarkDone(elapsed)
+    local waypoints = ns.Waypoints
+    local marked = waypoints and waypoints.marked
+    if not marked or marked.area then return false end
+    self.arriveSince = (self.arriveSince or 0) + (elapsed or 0)
+    if self.arriveSince < MapPins.ARRIVE_LOOK then return false end
+    self.arriveSince = 0
+    return MapPins.Reached(marked)
+end
+
+--- True when the player stands on a place { zone, x, y } (0 to 100).
+function MapPins.Reached(place)
+    local arrow, waypoints = ns.QuestArrow, ns.Waypoints
+    if not (arrow and arrow.Here and arrow.Offset and arrow.Measure and waypoints) then return false end
+    local ok, reached = pcall(function()
+        local here = arrow:Here()
+        if not here then return false end
+        local mapID = place.map or waypoints:MapFor(place.zone)
+        if not mapID then return false end
+        place.map = mapID
+        place.target = place.target or {}
+        local north, west = arrow.Offset(here, mapID, place.x / 100, place.y / 100, place.target)
+        if not north then return false end
+        return arrow.Measure(north, west) <= (arrow.ARRIVED or 15)
+    end)
+    return ok and reached or false
+end
+
 function MapPins:Step(elapsed)
     self.since = (self.since or 0) + (elapsed or 0)
     if self.since < STEP then return end
+    local spent = self.since
     self.since = 0
+    if self:MarkDone(spent) then ns.Waypoints:Unmark() end
     local ok, err = pcall(self.Draw, self)
     if not ok then ns.Debug("map pins:", tostring(err)) end
 end

@@ -278,6 +278,7 @@ L["%s A new one comes up as you level. Try another tab, or click Pick one to cho
 L["Pick one"] = "Выбрать"
 L["New upgrade on offer at level %d"] = "Новое улучшение на уровне %d"
 L["head for %s."] = "отправляйся в %s."
+L["Somewhere in %s"] = "Где-то в %s"
 L["Drag to make the panel bigger or smaller."] = "Тяни, чтобы сделать панель больше или меньше."
 L["Right-click to go back to normal size."] = "Правый щелчок вернёт обычный размер."
 
