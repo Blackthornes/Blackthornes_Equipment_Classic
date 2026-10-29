@@ -10,6 +10,9 @@ PR #244, 2026-10-23). This copy was made from it with its history on
   taken as it is: `UI/SharedMinimap.lua` at FILE_VERSION 2,
   `Media/Frame/MinimapBadge.tga` and `tools/make_minimap_art.py`, the same
   in all five Classic repos).
+- `3975656` Slim the shared minimap menu: names only, sized to fit (2026-10-29,
+  taken as it is: `UI/SharedMinimap.lua` at FILE_VERSION 3 and its test, the
+  same in all five Classic repos).
 
 Every catch-up reads `docs/CLASSIC_DIFFERENCES.md` first, and the PR that
 brings Forever commits over updates the line above to the newest one it took.
