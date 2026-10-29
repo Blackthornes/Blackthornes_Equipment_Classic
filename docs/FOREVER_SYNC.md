@@ -32,3 +32,9 @@ Brought over one at a time since:
 - `c281a6e` One minimap button for every Blackthornes addon (2026-10-28,
   Forever PR #261, cherry-picked as it is; `UI/SharedMinimap.lua` and its test
   are the same in all five Classic repos).
+- `0d0b503` Time arrow flights by their real length (2026-10-29, as it is).
+- `9992e47` Show on Map works without the game's pin (2026-10-29, blended
+  on top of Classic's own marker; see "Show on map uses Equipment's own pin"
+  in `docs/CLASSIC_DIFFERENCES.md`).
+- `dea75f5` (Butler's) the way there card's rows grow when a step wraps
+  (2026-10-29, `UI/TravelCard.lua` only).
