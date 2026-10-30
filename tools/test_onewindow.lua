@@ -2,7 +2,7 @@
 -- owner said build it, 2026-10-30).
 --
 -- What must hold:
---   1. Off unless ticked: the gear window opens in its own place.
+--   1. On unless unticked; unticked, the gear window opens in its own place.
 --   2. Ticked, opening Equipment opens the one window on it, with the gear
 --      window laid into its area, bare of its own rim and grip.
 --   3. Dungeon Quests, Dungeon Loot and Settings open in the same area,
@@ -24,6 +24,9 @@ suite.check("Equipment joins with its tabs", hub.entries.equipment and hub.entri
 suite.check("the one window is Equipment's own copy", Finder.One() == SW)
 
 -- 1.
+ns.db.oneWindow = nil
+suite.check("on unless unticked", SW.On())
+ns.db.oneWindow = false
 Finder:Show()
 suite.check("off: the gear window opens by itself", Finder.frame:IsShown() and not Finder:Hosted())
 Finder:Hide()
