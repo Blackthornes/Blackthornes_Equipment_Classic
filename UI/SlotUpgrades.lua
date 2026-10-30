@@ -1,7 +1,8 @@
 -- Blackthornes Equipment -- UI/SlotUpgrades.lua
 -- Upgrades on the character sheet: hover a gear slot and its tooltip lists
 -- the best upgrades on offer for it and where they come from; Alt-click the
--- slot for a panel of them with Track and Map buttons.
+-- slot for a panel of them with Track and Map buttons. The panel wears the
+-- house frame: gold rim, the slot's name on the plate, the red close gem.
 --
 -- The picks are the upgrade finder's (Finder:Latest, scanned again only
 -- when the gear, level or bags change), so the sheet, the finder window and
@@ -264,25 +265,28 @@ function SlotUpgrades:Build()
     frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
-    Theme.Window(frame)
+    Theme.Fill(frame, "window")
     if type(UISpecialFrames) == "table" then
         table.insert(UISpecialFrames, "BlackthornesEquipmentSlotUpgrades")
     end
 
-    local header = Theme.CreatePanel(frame, "header", false)
-    header:SetPoint("TOPLEFT")
-    header:SetPoint("TOPRIGHT")
-    header:SetHeight(32)
-    Theme.HouseHeader(header, 16)
-
-    local close = Widgets.CreateButton(header, "X", function() frame:Hide() end,
-        { width = 22, height = 20, danger = true })
-    close:SetPoint("RIGHT", -8, 0)
-
-    local title = Theme.CreateLabel(header, "title", "accent")
-    title:SetPoint("LEFT", PAD, 0)
-    title:SetPoint("RIGHT", close, "LEFT", -8, 0)
-    self.title = title
+    -- The house frame: the gold rim, the slot's name on the plate and the
+    -- red close gem, as the other windows wear it.
+    if ns.Titanforged then
+        self.trim = ns.Titanforged:Dress(frame, {
+            title = L.Format("Upgrades: %s", L["this slot"]),
+            close = function() frame:Hide() end,
+        })
+        local left, right, top, bottom = ns.Titanforged.Reach(self.trim)
+        if frame.SetClampRectInsets then frame:SetClampRectInsets(-left, right, top, -bottom) end
+    else
+        Theme.Border(frame, "borderLit")
+        local title = Theme.CreateLabel(frame, "title", "accent")
+        title:SetPoint("TOPLEFT", PAD, -10)
+        title:SetPoint("TOPRIGHT", -PAD, -10)
+        self.title = title
+    end
+    Theme.Halo(frame, 12, 0.14)
 
     local empty = Theme.CreateLabel(frame, "normal", "muted", "CENTER")
     empty:SetPoint("TOP", 0, -70)
@@ -304,7 +308,9 @@ end
 
 function SlotUpgrades:Fill()
     if not (self.frame and self.slot) then return end
-    self.title:SetText(L.Format("Upgrades: %s", SLOT_NAMES[self.slot] or L["this slot"]))
+    local heading = L.Format("Upgrades: %s", SLOT_NAMES[self.slot] or L["this slot"])
+    local plate = self.trim and rawget(self.trim, "plate")
+    if plate then plate:SetTitle(heading) elseif self.title then self.title:SetText(heading) end
     local picks = self:PicksFor(self.slot)
     for index, row in ipairs(self.rows) do
         local pick = picks[index]
