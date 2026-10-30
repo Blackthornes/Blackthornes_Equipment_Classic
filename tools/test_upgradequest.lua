@@ -565,7 +565,7 @@ ns.HandleSlash("quest")
 
 suite.check("long steps wrap rather than cut", Panel.Lines("small",
     "Pick up Wolves of the Forest from Marshal Dughan in Elwynn Forest (42.1, 65.9)", 200) > 1)
-suite.check("short ones take one line", Panel.Lines("small", "Put it on", 200) == 1)
+suite.check("short ones take one line", Panel.Lines("small", "Put It On", 200) == 1)
 suite.check("a link's hidden part takes no room",
     Panel.Lines("small", "|cff1eff00|Hitem:1001::::::::20:::::|h[Vest]|h|r", 60) == 1)
 

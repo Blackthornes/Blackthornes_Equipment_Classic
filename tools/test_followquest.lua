@@ -64,9 +64,9 @@ suite.check("hovering says a click follows it", TooltipText(vendorRow):find("Cli
 suite.check("and what that does, the green Quest tag included",
     TooltipText(vendorRow):find("It becomes your upgrade quest", 1, true) ~= nil
     and TooltipText(vendorRow):find("green Quest tag", 1, true) ~= nil)
-suite.check("the window's hint says so too", UI.hint:GetText():find("Click a row to follow it", 1, true) ~= nil)
-suite.check("the hint fits on one line",
-    ns.Theme.TextWidth("tiny", UI.hint:GetText()) <= UI.hint:GetWidth(), ns.Theme.TextWidth("tiny", UI.hint:GetText()))
+suite.check("the window has no help line under the list", (UI.hint:GetText() or "") == "")
+suite.check("the hover ends with the right-click hint",
+    TooltipText(vendorRow):find("Right-click for more.", 1, true) ~= nil)
 
 -- A skipped upgrade can still be chosen by hand.
 Quest:Skipped()[1001] = true
@@ -80,8 +80,8 @@ suite.check("the quest panel opens on it", Panel.frame and Panel.frame:IsShown()
     and Panel.name:GetText() == "item:1001", Panel.name and Panel.name:GetText())
 suite.check("the chat says so", env.ChatText():find("following item:1001", 1, true) ~= nil)
 vendorRow = RowFor(1001)
-suite.check("the row is marked Following", vendorRow.source:GetText():find("Following", 1, true) ~= nil,
-    vendorRow.source:GetText())
+suite.check("the row is marked Following", vendorRow.item:GetText():find("Following", 1, true) ~= nil,
+    vendorRow.item:GetText())
 suite.check("and hovering says it is the quest", TooltipText(vendorRow):find("Your upgrade quest", 1, true) ~= nil)
 suite.check("and how to drop it", TooltipText(vendorRow):find("To drop it, click Ignore on the quest panel", 1, true) ~= nil)
 
@@ -105,7 +105,14 @@ Click(RowFor(1001))
 
 -- Other clicks keep their jobs.
 Click(RowFor(1002), "RightButton")
-suite.check("right-click tracks", ns.Tracking:IsTracked(1002) and Quest:Tab() == "vendor")
+local menu = ns.RowMenu and ns.RowMenu.frame
+local trackLine
+for _, line in ipairs(menu and menu.lines or {}) do
+    if line.label and line.label:GetText() == "Track" then trackLine = line end
+end
+suite.check("right-click opens the row's menu, with Track", trackLine ~= nil and trackLine:IsShown())
+if trackLine then trackLine:GetScript("OnClick")(trackLine) end
+suite.check("its Track line tracks", ns.Tracking:IsTracked(1002) and Quest:Tab() == "vendor")
 ns.Tracking:Untrack(1002)
 _G.IsModifiedClick = function(what) return what == "CHATLINK" end
 local linked

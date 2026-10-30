@@ -241,9 +241,9 @@ function QuestLogUI:Build(frame, top)
 
     -- The buttons along the bottom act on the quest picked, or the first one
     -- in this zone.
-    local map = Widgets.CreateButton(view, L["Show on map"], function() QuestLogUI:Act("map") end,
+    local map = Widgets.CreateButton(view, L["Show on Map"], function() QuestLogUI:Act("map") end,
         { width = 96, height = 22, primary = true })
-    Explain(map, L["Show on map"],
+    Explain(map, L["Show on Map"],
         L["Pins the quest you picked on your map: where to do it, or where to hand it in."])
     self.mapButton = map
 
@@ -781,7 +781,7 @@ end
 --- The menu's lines for a quest: { text, action, color }.
 function QuestLogUI:MenuFor(quest)
     local log = ns.QuestLog
-    local list = { { L["Show on map"], "map" } }
+    local list = { { L["Show on Map"], "map" } }
     if log.Place(quest) or (ns.Waypoints and quest.zone and ns.Waypoints:MapFor(quest.zone)) then
         list[#list + 1] = { L["Point the arrow here"], "arrow" }
     end

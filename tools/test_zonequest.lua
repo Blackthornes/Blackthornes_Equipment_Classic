@@ -68,48 +68,36 @@ suite.check("and the quest tab", On("quest") == 1004, On("quest"))
 -- The panel's filters
 --------------------------------------------------------------------------------
 
-Panel:Refresh()
-suite.check("the panel has the zone box", Panel.zoneBox ~= nil and not Panel.zoneBox:GetChecked())
-suite.check("named plainly", Panel.zoneBox.label:GetText() == "This zone only")
-Panel.zoneBox:GetScript("OnEnter")(Panel.zoneBox)
-local tip = table.concat(GameTooltip._lines, "\n")
-suite.check("hovering says what it does", tip:find("zone you're in", 1, true) ~= nil, tip)
-Panel.zoneBox:GetScript("OnLeave")(Panel.zoneBox)
+local function Option(text)
+    for _, line in ipairs(Panel:OptionLines()) do
+        if line.text == text or line.text:find(text, 1, true) == 1 then return line end
+    end
+end
 
-suite.check("the panel has the solo box", Panel.soloBox ~= nil and Panel.soloBox.label:GetText() == "Solo quests only")
-suite.check("and the level stepper, at the finder's value", Panel.levelStepper ~= nil
-    and Panel.levelStepper:GetValue() == 4, Panel.levelStepper and Panel.levelStepper:GetValue())
+Panel:Refresh()
+suite.check("Options has This Zone Only", Option("This Zone Only") ~= nil and not Option("This Zone Only").checked)
+suite.check("and Solo Quests Only", Option("Solo Quests Only") ~= nil)
+suite.check("and Quest Level, at the finder's value", Option("Quest Level:") ~= nil
+    and Option("Quest Level:").text == "Quest Level: Up to +4", Option("Quest Level:") and Option("Quest Level:").text)
 suite.check("in the finder's words", Panel.QuestLevelsText(0) == "Up to my level"
     and Panel.QuestLevelsText(11) == "Any" and Panel.QuestLevelsText(4) == "Up to +4")
-
--- Everything fits inside the panel, measured.
-local Theme = ns.Theme
-local zoneWidth = Theme.TextWidth("small", "This zone only") + 24
-local soloWidth = Theme.TextWidth("small", "Solo quests only") + 24
-suite.check("the tick boxes fit on one row", 10 + zoneWidth + 16 + soloWidth <= 340 - 10,
-    10 + zoneWidth + 16 + soloWidth)
-local labelWidth = Theme.TextWidth("small", "Quest level")
-local rowWidth = 10 + labelWidth + 8 + Panel.levelStepper:GetWidth() + 10 + Panel.settingsButton:GetWidth() + 10
-suite.check("the level and Settings fit on the next", rowWidth <= 340, rowWidth)
-suite.check("the stepper holds its longest words", Panel.levelStepper:GetWidth()
-    >= Theme.TextWidth("small", "Up to my level") + 52)
+suite.check("the Options button opens the menu", Panel.optionsButton ~= nil)
+Panel.optionsButton:GetScript("OnClick")(Panel.optionsButton)
+suite.check("with every option", ns.RowMenu.frame and ns.RowMenu.frame.lines[1].label:GetText():find("This Zone Only", 1, true) ~= nil)
+ns.RowMenu:Close()
 
 -- Settings opens from the panel.
 suite.check("Settings is shut", not (ns.SettingsUI.frame and ns.SettingsUI.frame:IsShown()))
-Panel.settingsButton:GetScript("OnClick")(Panel.settingsButton)
-suite.check("the Settings button opens it", ns.SettingsUI.frame and ns.SettingsUI.frame:IsShown())
+Option("Settings").run()
+suite.check("the Settings line opens it", ns.SettingsUI.frame and ns.SettingsUI.frame:IsShown())
 suite.check("on its Upgrade quest page", ns.SettingsUI.pages.shown == "quest", ns.SettingsUI.pages.shown)
-Panel.settingsButton:GetScript("OnEnter")(Panel.settingsButton)
-tip = table.concat(GameTooltip._lines, "\n")
-suite.check("and says so", tip:find("settings", 1, true) ~= nil, tip)
-Panel.settingsButton:GetScript("OnLeave")(Panel.settingsButton)
 ns.SettingsUI:Hide()
 
 --------------------------------------------------------------------------------
 -- This zone only
 --------------------------------------------------------------------------------
 
-Panel.zoneBox:GetScript("OnClick")(Panel.zoneBox)
+Option("This Zone Only").run()
 suite.check("ticking it saves it", ns.db.upgradeQuestZoneOnly == true and Quest:ZoneOnly())
 suite.check("the vendor tab picks again here", On("vendor") == 1001, On("vendor"))
 suite.check("and so does the quest tab", On("quest") == 1003, On("quest"))
@@ -144,8 +132,8 @@ zone = "Elwynn Forest"
 Quest:OnEvent("ZONE_CHANGED_NEW_AREA")
 suite.check("back home, the quest tab picks here", On("quest") == 1003, On("quest"))
 Panel:Refresh()
-suite.check("the box shows it ticked", Panel.zoneBox:GetChecked())
-Panel.zoneBox:GetScript("OnClick")(Panel.zoneBox)
+suite.check("the line shows it ticked", Option("This Zone Only").checked)
+Option("This Zone Only").run()
 suite.check("unticking saves it", ns.db.upgradeQuestZoneOnly == false)
 suite.check("the quest tab picks the best anywhere again", On("quest") == 1004, On("quest"))
 suite.check("the followed upgrade is kept", On("vendor") == 1001, On("vendor"))
@@ -214,8 +202,8 @@ ns.Toast.Show = show
 
 suite.check("on by default", ns.db.upgradeQuestZoneSwap == nil and Quest:ZoneSwap())
 Panel:Refresh()
-suite.check("the panel shows it ticked", Panel.swapBox:GetChecked())
-Panel.swapBox:GetScript("OnClick")(Panel.swapBox)
+suite.check("the panel shows it ticked", Option("Change on a New Zone").checked)
+Option("Change on a New Zone").run()
 suite.check("unticking saves it", ns.db.upgradeQuestZoneSwap == false and not Quest:ZoneSwap())
 suite.check("and lets nothing go yet", On("vendor") == 1002 and On("quest") == 1004)
 zone = "Elwynn Forest"
@@ -245,11 +233,10 @@ local T = ns.Theme
 suite.check("both Settings boxes fit their row", 150 + 20 + T.TextWidth("small", "Solo only") <= 150 + 92 - 6
     and 150 + 92 + 20 + T.TextWidth("small", "Zone swap") <= 330,
     T.TextWidth("small", "Solo only") .. " " .. T.TextWidth("small", "Zone swap"))
-suite.check("the panel's box fits", 20 + T.TextWidth("small", "Change on a new zone") <= 340 - 20)
 ns.SettingsUI.controls.questZoneSwap:GetScript("OnClick")(ns.SettingsUI.controls.questZoneSwap)
 suite.check("Settings ticks it back on", ns.db.upgradeQuestZoneSwap == true and Quest:ZoneSwap())
 Panel:Refresh()
-suite.check("and the panel follows", Panel.swapBox:GetChecked())
+suite.check("and the panel follows", Option("Change on a New Zone").checked)
 ns.SettingsUI:Hide()
 zone = "Westfall"
 Quest:OnEvent("ZONE_CHANGED_NEW_AREA")
@@ -317,7 +304,9 @@ Quest:SetZoneOnly(false)
 --------------------------------------------------------------------------------
 
 Panel:Refresh()
-Panel.levelStepper:Pick(Panel.levelStepper:GetValue() - 1)
+for _, line in ipairs(Panel:LevelLines()) do
+    if line.text == "Up to +3" then line.run() end
+end
 suite.check("the panel's stepper sets the finder's limit", ns.db.questLevelsAbove == 3
     and Finder:QuestLevelsAbove() == 3, ns.db.questLevelsAbove)
 ns.FinderUI:Show()
@@ -325,20 +314,20 @@ suite.check("the finder's stepper follows", ns.FinderUI.questLevels:GetValue() =
     ns.FinderUI.questLevels:GetValue())
 Finder:SetQuestLevelsAbove(Finder.QUEST_LEVELS_ANY)
 Panel:Refresh()
-suite.check("and the panel follows the finder", Panel.levelStepper:GetValue() == Finder.QUEST_LEVELS_ANY,
-    Panel.levelStepper:GetValue())
+suite.check("and the panel follows the finder", Option("Quest Level:").text == "Quest Level: Any",
+    Option("Quest Level:").text)
 
-Panel.soloBox:GetScript("OnClick")(Panel.soloBox)
+Option("Solo Quests Only").run()
 suite.check("the panel's solo box is the same switch", ns.db.soloQuestsOnly == true
     and ns.FinderUI.solo:GetChecked())
 Finder:SetSoloOnly(false)
 Panel:Refresh()
-suite.check("and follows it back", not Panel.soloBox:GetChecked())
+suite.check("and follows it back", not Option("Solo Quests Only").checked)
 
--- Folded, only the header shows.
+-- Folded, only the plate shows.
 Panel:ToggleFold()
-suite.check("folded, the filters hide", not Panel.filters:IsShown())
+suite.check("folded, the quest hides", Panel.folded and not Panel.body:IsShown())
 Panel:ToggleFold()
-suite.check("unfolded, they are back", Panel.filters:IsShown())
+suite.check("unfolded, it is back", not Panel.folded and Panel.body:IsShown())
 
 suite.done()

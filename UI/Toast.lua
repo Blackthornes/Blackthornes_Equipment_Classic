@@ -79,7 +79,7 @@ function Toast:Build()
     self.text = text
 
     -- An upgrade in the bags can be put on from here, out of combat.
-    local wear = Widgets.CreateButton(frame, L["Put it on"], function()
+    local wear = Widgets.CreateButton(frame, L["Put It On"], function()
         local link = rawget(Toast, "link")
         if link and ns.Wear:PutOn(link) then Toast:Dismiss() end
     end, { width = 90, height = BUTTON_HEIGHT, primary = true })

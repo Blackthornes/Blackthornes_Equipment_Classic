@@ -723,7 +723,7 @@ function SettingsUI:BuildQuest()
     -- The quest arrow, as the Arrow button on the quest panel and /beq
     -- arrow switch it, and /beq arrow next as a button. /beq arrow check is
     -- typed only (the owner, 2026-10-23).
-    pages:Section("quest", 2, L["QUEST ARROW"])
+    pages:Section("quest", 2, L["ARROW"])
 
     local arrowRow = pages:Row("quest", 2, L["Quest Arrow:"],
         L["Points the way to the quest's next place. Click a step to aim it."])
@@ -791,23 +791,9 @@ function SettingsUI:BuildGeneral()
     local controls = self.controls
     local pages = self.pages
 
+    -- The rows every Blackthornes addon shares, in the same order (the
+    -- unified look, card 13), then this addon's own.
     pages:Section("general", 1, L["WINDOWS"])
-
-    -- The minimap button always shows (the owner, 2026-10-15); a saved
-    -- minimapHidden is kept but no longer read.
-    local positionRow = pages:Row("general", 1, L["Window Positions:"],
-        L["Reset the UI windows to their defaults."])
-    local reset = Widgets.CreateButton(positionRow, L["Set Default"], function()
-        SettingsUI:ResetPositions()
-        ns.Print(L["UI windows set to defaults."])
-    end, { width = 100, height = 20 })
-    reset:SetPoint("TOPLEFT", CONTROL_X, 0)
-    controls.resetPositions = reset
-
-    -- Bigger letters in the same windows, as Tradeskills has. Every size
-    -- is read as text is drawn, so it waits for /reload.
-    local textRow = pages:Row("general", 1, L["Text Size:"], "")
-    controls.textSize = ns.SettingsPages.TextSizeControl(textRow, CONTROL_X, function() return ns.db end)
 
     -- Asked 2026-10-10: the game's own look for players who would rather
     -- the windows matched the rest of their screen. Read at login, so it
@@ -816,17 +802,23 @@ function SettingsUI:BuildGeneral()
     local styleRow = pages:Row("general", 1, L["Window Style:"], "")
     controls.windowStyle = self:WindowStyleControl(styleRow)
 
-    -- One minimap button for every Blackthornes addon (UI/SharedMinimap.lua,
-    -- the owner, 2026-10-28): ticked unless unticked, the same in all five.
-    local combineRow = pages:Row("general", 1, L["Combine Addon Buttons:"], nil)
-    controls.combineButtons = Widgets.CreateCheckbox(combineRow, L["On"], function(checked)
-        if ns.SharedMinimap then ns.SharedMinimap.SetCombined(checked) end
-    end, true)
-    controls.combineButtons:SetPoint("TOPLEFT", CONTROL_X, -2)
+    -- Bigger letters in the same windows, as Tradeskills has. Every size
+    -- is read as text is drawn, so it waits for /reload.
+    local textRow = pages:Row("general", 1, L["Text Size:"], "")
+    controls.textSize = ns.SettingsPages.TextSizeControl(textRow, CONTROL_X, function() return ns.db end)
+
+    -- The size every gear window tab shares, the one its grip saves.
+    local sizeRow = pages:Row("general", 1, L["Window Size:"], nil)
+    controls.windowScale = ns.SettingsPages.WindowSizeControl(sizeRow, CONTROL_X,
+        function() return ns.db and ns.db.finderScale end,
+        function(percent)
+            if not ns.db then return end
+            ns.db.finderScale = percent
+            if ns.FinderUI then ns.FinderUI:ScaleChanged() end
+        end)
 
     -- How much the windows move: they rise in, glow and glint at Full,
     -- only fade at Subtle and stay still at Off. Full until picked.
-    pages:Section("general", 1, L["EFFECTS"])
     local effectsRow = pages:Row("general", 1, L["Effects:"], nil)
     local Motion = ns.Motion
     local effectNames = { full = L["Full"], subtle = L["Subtle"], off = L["Off"] }
@@ -845,7 +837,26 @@ function SettingsUI:BuildGeneral()
     controls.effects:SetPoint("TOPLEFT", CONTROL_X, 0)
     controls.effectsIndex = EffectIndex
 
-    pages:Section("general", 2, L["ADVANCED"])
+    -- One minimap button for every Blackthornes addon (UI/SharedMinimap.lua,
+    -- the owner, 2026-10-28): ticked unless unticked, the same in all five.
+    local combineRow = pages:Row("general", 1, L["Combine Addon Buttons:"], nil)
+    controls.combineButtons = Widgets.CreateCheckbox(combineRow, L["On"], function(checked)
+        if ns.SharedMinimap then ns.SharedMinimap.SetCombined(checked) end
+    end, true)
+    controls.combineButtons:SetPoint("TOPLEFT", CONTROL_X, -2)
+
+    -- The minimap button always shows (the owner, 2026-10-15); a saved
+    -- minimapHidden is kept but no longer read.
+    local positionRow = pages:Row("general", 1, L["Window Positions:"],
+        L["Reset the UI windows to their defaults."])
+    local reset = Widgets.CreateButton(positionRow, L["Set Default"], function()
+        SettingsUI:ResetPositions()
+        ns.Print(L["UI windows set to defaults."])
+    end, { width = 100, height = 20 })
+    reset:SetPoint("TOPLEFT", CONTROL_X, 0)
+    controls.resetPositions = reset
+
+    pages:Section("general", 2, L["ADDONS"])
 
     -- Debug, the speed check and the client check are typed only (/beq
     -- debug, perf, probe; the owner, 2026-10-23): players don't need them.
@@ -877,6 +888,25 @@ function SettingsUI:BuildGeneral()
         ns.WhatsNew:SetMotionOn(checked)
     end, true)
     controls.whatsNewMotion:SetPoint("TOPLEFT", CONTROL_X, -2)
+
+    -- The two panels that stay up while you play let the world show through
+    -- (UI/SeeThrough.lua, card 14 of the unified look): Off unless picked.
+    pages:Section("general", 2, L["TRANSPARENT"])
+    controls.seeThrough = {}
+    local see = ns.SeeThrough
+    for _, spec in ipairs({ { "hunts", L["Upgrade Hunts:"] }, { "quest", L["Upgrade Quest:"] } }) do
+        local id = spec[1]
+        local row = pages:Row("general", 2, spec[2], nil)
+        local names = see and see.Names() or { [0] = L["Off"] }
+        local choice = Widgets.CreateChoice(row, {
+            min = 0, max = see and #see.LEVELS or 0, step = 1, value = see and see:Level(id) or 0,
+            format = function(level) return names[level] end,
+            onChange = function(level) if see then see:Set(id, level) end end,
+        })
+        ns.SettingsPages.FitStepper(choice, names)
+        choice:SetPoint("TOPLEFT", CONTROL_X, -2)
+        controls.seeThrough[id] = choice
+    end
 end
 
 -- The window styles, in the order the stepper steps through them.
@@ -900,6 +930,7 @@ function SettingsUI:WindowStyleControl(row)
         format = function(value) return self.WINDOW_STYLE_LABELS[styles[value]] end,
         onChange = function(value)
             ns.db.windowStyle = styles[value]
+            if ns.SharedChoices then ns.SharedChoices:Changed("windowStyle", styles[value]) end
             reload:SetShown(styles[value] ~= Drawn())
         end,
     })
@@ -991,6 +1022,10 @@ function SettingsUI:Refresh()
     controls.windowStyle:Sync()
     controls.combineButtons:SetChecked(not ns.SharedMinimap or ns.SharedMinimap.Combined())
     controls.effects:SetValue(controls.effectsIndex(), true)
+    if ns.SeeThrough then
+        for id, choice in pairs(controls.seeThrough or {}) do choice:SetValue(ns.SeeThrough:Level(id), true) end
+    end
+    controls.windowScale:Sync()
     self.pages:Refresh()
 end
 
@@ -1148,3 +1183,27 @@ end)
 -- list, which would otherwise print the same line three times.
 ns.commands.options = ns.commands.settings
 ns.commands.config = ns.commands.settings
+
+--------------------------------------------------------------------------------
+-- Choices every Blackthornes addon shares (UI/SharedChoices.lua): a change
+-- made in a sister is written here the way this addon writes it itself.
+--------------------------------------------------------------------------------
+
+if ns.SharedChoices then
+    ns.SharedChoices:Join("Equipment", function(choice, value)
+        if not ns.db then return end
+        if choice == "textSize" then
+            if ns.Theme.TEXT_STEPS and ns.Theme.TEXT_STEPS[value] then ns.db.textSize = value end
+        elseif choice == "windowStyle" then
+            if value == "titanforged" or value == "blizzard" then ns.db.windowStyle = value end
+        elseif choice == "effects" then
+            if value == "full" or value == "subtle" or value == "off" then ns.Motion.SetLevel(value) end
+        elseif choice == "useTomTom" then
+            if ns.TomTom then ns.TomTom:SetOn(value and true or false) end
+        elseif choice == "arrowRoute" then
+            if ns.Travel then ns.Travel:SetOn(value and true or false) end
+        end
+        -- Era's Equipment has no Arrow Size: an arrowSize from a sister is left alone.
+        if ns.SettingsUI and ns.SettingsUI.Refresh and ns.SettingsUI.frame and ns.SettingsUI.frame:IsShown() then pcall(ns.SettingsUI.Refresh, ns.SettingsUI) end
+    end)
+end

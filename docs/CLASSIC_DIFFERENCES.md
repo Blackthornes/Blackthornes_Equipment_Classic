@@ -164,3 +164,11 @@ next gear or level change. They hear Era's too now (`Finder:OnEnable`,
 - Skyborne races in `Finder.Side` and `FOREVER_DUNGEON_PLACES` are left in;
   they are harmless on Era.
 - Not yet seen in an Era client. Client calls are read in a pcall.
+
+## The house look (2026-10-29)
+
+- Brought over from Forever's "One look across the five addons". The game
+  calls it uses (`CreateFrame`, `C_Timer.After`, `GetTime`, the usual frame
+  methods) are all in Era, so nothing needed a fallback.
+- No Arrow Size here: the shared choice is heard and left alone.
+

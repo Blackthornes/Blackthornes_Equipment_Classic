@@ -189,7 +189,7 @@ function Drawer:Build()
         self.lines[index] = row
     end
 
-    local way = Widgets.CreateButton(frame, L["Show the way"], function()
+    local way = Widgets.CreateButton(frame, L["Show the Way"], function()
         if ns.ClassTraining then ns.ClassTraining:ShowTheWay() end
     end, { width = 100, height = 22, primary = true })
     way:SetPoint("BOTTOMRIGHT", -PADDING, 12)

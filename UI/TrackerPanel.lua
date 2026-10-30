@@ -3,11 +3,14 @@
 -- with its icon, where to get it, and a green "in your bags" once it is got.
 --
 -- Click a hunt to pin its spot on the map, shift-click to link it in chat,
--- right-click to stop tracking it. The header's Done button swaps the list
--- for the hunts already finished. The panel shows itself while anything is
--- tracked, unless the "Upgrade tracker" setting (`showTracker`) is off, and
--- folds down to its header with the "-" button. It can be dragged anywhere;
--- the spot is kept with the other window positions.
+-- right-click for its menu. The Hunts and Done tabs (the house view tabs,
+-- 2026-10-29) swap the list for the hunts already finished. The panel shows
+-- itself while anything is tracked, unless the "Upgrade tracker" setting
+-- (`showTracker`) is off. Its header is the house panel header: gold title,
+-- a count chip, the fold gem (down to its header) and the close gem (put
+-- away until a hunt is tracked or changed). Transparent is
+-- `huntsSeeThrough` (UI/SeeThrough.lua). It can be dragged anywhere; the
+-- spot is kept with the other window positions.
 
 local _, ns = ...
 local L = ns.L
@@ -20,6 +23,7 @@ local Motion = ns.Motion
 
 local WIDTH = 260
 local HEADER = 26
+local TABS = 20
 local ROW_HEIGHT = 44
 local ICON = 24
 local MOST_ROWS = 8
@@ -52,9 +56,9 @@ local function ShowTooltip(row)
             GameTooltip:AddLine(ns.Tracking.PlaceText(hunt.place), Theme.Unpack("text"))
         end
         if hunt.place and hunt.place.x then
-            GameTooltip:AddLine(L["Click to pin it on your map"], Theme.Unpack("muted"))
+            GameTooltip:AddLine(L["Click to pin it on your map"], Theme.Unpack("dim"))
         end
-        GameTooltip:AddLine(L["Right-click to stop tracking"], Theme.Unpack("muted"))
+        GameTooltip:AddLine(L["Right-click to stop tracking"], Theme.Unpack("dim"))
     end
     GameTooltip:Show()
 end
@@ -62,10 +66,11 @@ end
 function TrackerPanel:BuildRow(index)
     local row = CreateFrame("Button", nil, self.frame)
     row:SetSize(WIDTH - PAD * 2, ROW_HEIGHT)
-    row:SetPoint("TOPLEFT", PAD, -(HEADER + 4 + (index - 1) * ROW_HEIGHT))
+    row:SetPoint("TOPLEFT", PAD, -(HEADER + TABS + 6 + (index - 1) * ROW_HEIGHT))
     -- Dark glass, a shade apart row by row, with a fine line under each.
     row.restKey = index % 2 == 0 and "glassAlt" or "glass"
     row.background = Theme.Fill(row, row.restKey)
+    if ns.SeeThrough then ns.SeeThrough:AddGlass("hunts", row.background) end
     row.rule = row:CreateTexture(nil, "BACKGROUND", nil, 1)
     row.rule:SetPoint("BOTTOMLEFT")
     row.rule:SetPoint("BOTTOMRIGHT")
@@ -105,7 +110,7 @@ function TrackerPanel:BuildRow(index)
         local hunt = self.hunt
         if not hunt then return end
         if button == "RightButton" then
-            if not hunt.done and ns.Tracking then ns.Tracking:Untrack(hunt.itemID) end
+            TrackerPanel:OpenMenu(hunt)
             return
         end
         if type(IsModifiedClick) == "function" and type(ChatEdit_InsertLink) == "function" then
@@ -132,7 +137,9 @@ function TrackerPanel:Build()
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
-    Theme.Window(frame)
+    frame.fill = Theme.Fill(frame, "window")
+    Theme.Border(frame, "borderLit")
+    Theme.Halo(frame, 10, 0.14)
     frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
@@ -146,23 +153,41 @@ function TrackerPanel:Build()
     Theme.HouseHeader(header, 14)
     header:EnableMouse(false)
 
-    local fold = Widgets.CreateButton(header, "-", function() TrackerPanel:ToggleFold() end,
-        { width = 18, height = 16 })
-    fold:SetPoint("RIGHT", -5, 0)
-    self.foldButton = fold
+    -- The house panel header: fold gem, close gem, a count chip, the title.
+    local gems = Widgets.CreatePanelGems(header, {
+        onFold = function(folded)
+            TrackerPanel.folded = folded
+            TrackerPanel:Refresh()
+        end,
+        onClose = function() TrackerPanel:Close() end,
+    })
+    self.gems = gems
 
-    local done = Widgets.CreateButton(header, L["Done"], function() TrackerPanel:ToggleDone() end,
-        { width = 40, height = 16 })
-    done:SetPoint("RIGHT", fold, "LEFT", -4, 0)
-    self.doneButton = done
+    local chip = Widgets.CreateChip(header, "0", nil, { height = 16, selected = true })
+    chip:SetPoint("RIGHT", gems.fold, "LEFT", -6, 0)
+    chip:EnableMouse(false)
+    self.countChip = chip
 
     local title = Theme.CreateLabel(header, "small", "accent")
     title:SetPoint("LEFT", 10, 0)
-    title:SetPoint("RIGHT", done, "LEFT", -6, 0)
+    title:SetPoint("RIGHT", chip, "LEFT", -6, 0)
+    title:SetText(L["Upgrade Hunts"])
     self.title = title
 
+    -- Hunts and Done, the house view tabs on top of the list.
+    local tabs = Widgets.CreateViewTabs(frame, {
+        { key = "hunts", text = L["Hunts"] },
+        { key = "done", text = L["Done"] },
+    }, function(key)
+        TrackerPanel.showingDone = key == "done"
+        TrackerPanel:Refresh()
+    end, { selected = "hunts", height = TABS })
+    tabs:SetPoint("TOPLEFT", PAD, -(HEADER + 4))
+    tabs:SetPoint("TOPRIGHT", -PAD, -(HEADER + 4))
+    self.tabs = tabs
+
     local empty = Theme.CreateLabel(frame, "tiny", "muted")
-    empty:SetPoint("TOPLEFT", PAD + 2, -(HEADER + 8))
+    empty:SetPoint("TOPLEFT", PAD + 2, -(HEADER + TABS + 10))
     empty:SetWidth(WIDTH - PAD * 2)
     self.empty = empty
 
@@ -171,6 +196,11 @@ function TrackerPanel:Build()
     for index = 1, MOST_ROWS do self.rows[index] = self:BuildRow(index) end
 
     self:RestorePosition()
+    if ns.SeeThrough then
+        ns.SeeThrough:AddGlass("hunts", frame.fill)
+        ns.SeeThrough:AddGlass("hunts", header.background)
+        ns.SeeThrough:Attach("hunts", frame)
+    end
     frame:Hide()
     return frame
 end
@@ -206,20 +236,19 @@ end
 function TrackerPanel:Refresh()
     if not ns.Tracking then return end
     local count = ns.Tracking:Count()
-    if not self:IsEnabled() or (count == 0 and not self.showingDone) then
+    if not self:IsEnabled() or self.closed or (count == 0 and not self.showingDone) then
         if self.frame then self.frame:Hide() end
         return
     end
     self:Build()
 
     local lines = self:Lines()
-    if self.showingDone then
-        self.title:SetText(L.Format("Finished hunts (%d)", #lines))
-    else
-        self.title:SetText(L.Format("Upgrade hunts (%d)", count))
-    end
-    self.doneButton:SetText(self.showingDone and L["Hunts"] or L["Done"])
-    self.foldButton:SetText(self.folded and "+" or "-")
+    self.countChip.label:SetText(tostring(self.showingDone and #lines or count))
+    self.countChip:SetText(tostring(self.showingDone and #lines or count))
+    self.countChip:SetSelected(true)
+    self.tabs:Select(self.showingDone and "done" or "hunts", true)
+    self.tabs:SetShown(not self.folded)
+    self.gems:SetFolded(self.folded)
 
     local shown = 0
     for index, row in ipairs(self.rows) do
@@ -240,7 +269,7 @@ function TrackerPanel:Refresh()
     self.empty:SetShown(empty)
     self.empty:SetText(self.showingDone and L["No hunts finished yet."] or "")
     local height = HEADER
-    if not self.folded then height = HEADER + 8 + math.max(shown, empty and 1 or 0) * ROW_HEIGHT end
+    if not self.folded then height = HEADER + TABS + 10 + math.max(shown, empty and 1 or 0) * ROW_HEIGHT end
     self.frame:SetHeight(height)
 
     if not self.frame:IsShown() then
@@ -254,6 +283,29 @@ function TrackerPanel:ToggleFold()
     self:Refresh()
 end
 
+--- The close gem: put away until a hunt is tracked or changed.
+function TrackerPanel:Close()
+    self.closed = true
+    if self.frame then self.frame:Hide() end
+end
+
+--- A hunt's right-click menu (the house row menu).
+function TrackerPanel:OpenMenu(hunt)
+    if not (hunt and ns.RowMenu) then return end
+    local lines = {}
+    if hunt.place and hunt.place.x and ns.Waypoints then
+        lines[#lines + 1] = { text = L["Show on Map"], run = function()
+            ns.Waypoints:Show(hunt.place, hunt.place.name)
+        end }
+    end
+    if not hunt.done and ns.Tracking then
+        lines[#lines + 1] = { text = L["Stop Tracking"], run = function()
+            ns.Tracking:Untrack(hunt.itemID)
+        end }
+    end
+    return ns.RowMenu:Open(lines, { title = ns.Items and ns.Items.ShowLink(hunt.link) or nil })
+end
+
 function TrackerPanel:ToggleDone()
     self.showingDone = not self.showingDone
     self.folded = false
@@ -261,6 +313,7 @@ function TrackerPanel:ToggleDone()
 end
 
 function TrackerPanel:OnTrackingChanged()
+    self.closed = nil
     self:Refresh()
 end
 

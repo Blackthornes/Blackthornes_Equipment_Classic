@@ -13,6 +13,21 @@ PR #244, 2026-10-23). This copy was made from it with its history on
 - `3975656` Slim the shared minimap menu: names only, sized to fit (2026-10-29,
   taken as it is: `UI/SharedMinimap.lua` at FILE_VERSION 3 and its test, the
   same in all five Classic repos).
+- `d77e903` Settings: "Show Descriptions" in Title Case (2026-10-29,
+  Forever PR #255, as it is).
+- `804f19c` Dress the slot upgrades list in the house frame (2026-10-29,
+  Forever PR #254, as it is).
+- `e2089ea` Gold rim and close gem on the upgrade banner and the training
+  drawer (2026-10-29, Forever PR #253, as it is).
+- `7bccd3e` One look across the five addons (2026-10-29, Forever PR #268):
+  `UI/HouseKit.lua`, `UI/RowMenu.lua`, `UI/Notice.lua` and
+  `UI/SharedChoices.lua` as they are (the same in all five Classic repos),
+  Upgrade Hunts' view tabs and panel gems, the upgrade quest's Options
+  menu, Transparent for both panels (`UI/SeeThrough.lua`), one-line finder
+  rows, Title Case buttons and the General page. Left out: Arrow Size
+  (Equipment Classic has none). Show on Map keeps Classic's own pin.
+  `UI/Plaque.lua` keeps Classic's own copy with the new `Plaque.TextWidth`,
+  the same in Farmer, Pets, Equipment and Tradeskills Classic.
 
 Every catch-up reads `docs/CLASSIC_DIFFERENCES.md` first, and the PR that
 brings Forever commits over updates the line above to the newest one it took.

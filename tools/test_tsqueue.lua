@@ -82,7 +82,7 @@ local queue = {
 _G.BlackthornesTS = { Queue = queue }
 
 suite.check("with Tradeskills it shows", TSQ:Available())
-suite.check("and reads Queue it", TSQ:Label(3001) == "Queue it")
+suite.check("and reads Queue it", TSQ:Label(3001) == "Queue It")
 
 suite.check("a known craft is queued", TSQ:Queue(known) == true and crafts[9001] == 1)
 suite.check("then reads Queued", TSQ:Label(3001) == "Queued")
@@ -124,7 +124,7 @@ for _, row in ipairs(ns.FinderUI.rows) do
         label = label or row.queueIt.label:GetText()
     end
 end
-suite.check("crafted rows in the finder show Queue it", shown > 0 and label == "Queue it", tostring(shown) .. " " .. tostring(label))
+suite.check("crafted rows in the finder show Queue it", shown > 0 and label == "Queue It", tostring(shown) .. " " .. tostring(label))
 ns.FinderUI:Hide()
 
 queue.Ensure = function() error("boom") end

@@ -48,8 +48,8 @@ Theme.colors = {
     craft     = { 1.000, 0.584, 0.302 },   -- #FF954D, crafted gear in the upgrade finder
 
     text      = { 0.902, 0.910, 0.925 },   -- #E6E8EC
-    muted     = { 0.478, 0.502, 0.541 },   -- #7A8089
-    dim       = { 0.330, 0.350, 0.390 },
+    muted     = { 0.545, 0.569, 0.608 },   -- #8B919B
+    dim       = { 0.420, 0.440, 0.482 },   -- #6B707B
 }
 
 local FONT do
