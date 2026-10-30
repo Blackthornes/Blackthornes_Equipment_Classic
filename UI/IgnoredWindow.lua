@@ -137,11 +137,11 @@ function IgnoredUI:Build()
     hint:SetText(L["Ignored upgrades are never picked for the upgrade quest on this character. Restore one and it can be picked again."])
     self.hint = hint
 
-    self.restoreAll = Widgets.CreateButton(frame, L["Restore all"], function()
+    self.restoreAll = Widgets.CreateButton(frame, L["Restore All"], function()
         ns.HandleSlash("quest restore")
     end, { width = 96, height = 22, primary = true })
     self.restoreAll:SetPoint("BOTTOMLEFT", PADDING, 14)
-    Explain(self.restoreAll, L["Restore all"],
+    Explain(self.restoreAll, L["Restore All"],
         L["Lets every ignored upgrade be picked again."])
 
     frame:Hide()

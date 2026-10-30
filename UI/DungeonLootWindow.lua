@@ -3,8 +3,8 @@
 -- words he approved): the dungeons down the left, and the one picked shows
 -- what its bosses drop: the item, its slot, the boss and, for an upgrade
 -- for the character playing, how much better it is. Armor and Stat chips
--- and Upgrades Only narrow the list; the headings sort it. Follow points
--- the quest arrow at the door, Show the Way puts the game's map pin there.
+-- and Upgrades Only narrow the list; the headings sort it. Show the Way
+-- lays our marker at the door and points the quest arrow there.
 -- Opened with /beq loot, the gear window's Dungeon Loot tab or
 -- Settings.
 --
@@ -171,7 +171,7 @@ function DLUI:Build()
     Theme.Fill(frame, "window")
     if ns.Titanforged then
         local trim = ns.Titanforged:Dress(frame, {
-            title = L["Dungeon Loot"],
+            title = "Blackthornes Equipment",
             portrait = true,
             close = function() DLUI:Hide() end,
         })
@@ -342,18 +342,16 @@ function DLUI:BuildList()
         self.rows[index] = row
     end
 
-    -- The foot: how many show, and the two buttons for the door.
-    local follow = Widgets.CreateButton(well, L["Follow"], function()
+    -- The foot: how many show, and Show the Way to the door: our marker on
+    -- the map and the arrow (TomTom if picked).
+    local wayText = L["Show the Way"]
+    local way = Widgets.CreateButton(well, wayText, function()
         local dungeon = DLUI:Picked()
-        if dungeon then ns.DungeonLoot:Follow(dungeon) end
-    end, { width = 80, height = 24, primary = true })
-    follow:SetPoint("BOTTOMRIGHT", -12, 10)
-    self.followButton = follow
-    local way = Widgets.CreateButton(well, L["Show the Way"], function()
-        local dungeon = DLUI:Picked()
-        if dungeon then ns.DungeonLoot:ShowTheWay(dungeon) end
-    end, { width = 110, height = 24 })
-    way:SetPoint("RIGHT", follow, "LEFT", -8, 0)
+        if not dungeon then return end
+        ns.DungeonLoot:ShowTheWay(dungeon)
+        ns.DungeonLoot:Follow(dungeon)
+    end, { width = math.max(110, Theme.TextWidth("small", wayText) + 28), height = 24, primary = true })
+    way:SetPoint("BOTTOMRIGHT", -12, 10)
     self.wayButton = way
     local foot = Theme.CreateLabel(well, "small", "muted")
     foot:SetPoint("BOTTOMLEFT", 14, 16)
@@ -567,7 +565,7 @@ function DLUI:FillList()
         and L["Nothing here matches. Try fewer picks."] or "")
     self.foot:SetText(DLUI.FootText(shown, self.data.upgrades))
     local door = dungeon and ns.DungeonLoot.Door(dungeon)
-    for _, button in ipairs({ self.followButton, self.wayButton }) do
+    for _, button in ipairs({ self.wayButton }) do
         button:SetAlpha(door and 1 or 0.45)
         if button.SetEnabled then button:SetEnabled(door ~= nil) end
     end

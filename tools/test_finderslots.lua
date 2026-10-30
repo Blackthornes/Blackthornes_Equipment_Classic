@@ -84,7 +84,7 @@ suite.check("the tick boxes in order", Box("vendor") and Box("quest") and Box("d
 suite.check("worded for players", Box("dungeon").label:GetText() == "Dungeons" and Box("raid").label:GetText() == "Raids",
     Box("dungeon").label:GetText())
 suite.check("Only what I can get now starts unticked", ns.db.finderGetNow == false and not UI.getNow:GetChecked())
-suite.check("named as approved", UI.getNow.label:GetText() == "Only what I can get now")
+suite.check("named as approved", UI.getNow.label:GetText() == "Only What I Can Get Now")
 
 suite.check("the first slot with upgrades shows, chest", UI.slot == 5, UI.slot)
 suite.check("every upgrade for it, best first", Listed() == "1003,1002,1001,1004", Listed())
@@ -123,7 +123,9 @@ Heading("gain"):GetScript("OnClick")(Heading("gain"))
 suite.check("and back to best first", Listed() == "1003,1002,1001,1004" and UI.sortKey == nil, Listed())
 suite.check("each row shows its level and where", UI.rows[1].level:GetText() == "20"
     and UI.rows[1].where:GetText():find("Molten Core", 1, true) ~= nil, UI.rows[1].level:GetText())
-suite.check("the hint says how", UI.hint:GetText():find("Click a heading to sort.", 1, true) ~= nil)
+Heading("item"):GetScript("OnEnter")(Heading("item"))
+suite.check("the heading's hover says how", table.concat(GameTooltip._lines or {}, "\n"):find("Click a heading to sort.", 1, true) ~= nil)
+Heading("item"):GetScript("OnLeave")(Heading("item"))
 
 -- Raids apart from dungeons.
 Box("raid"):GetScript("OnClick")(Box("raid"))

@@ -91,8 +91,13 @@ local refresh = Quest.Refresh
 local refreshes = 0
 if refresh then Quest.Refresh = function(...) refreshes = refreshes + 1 return refresh(...) end end
 
-suite.check("the panel has the tick box", Panel.stepOnlyBox ~= nil and not Panel.stepOnlyBox:GetChecked())
-Panel.stepOnlyBox:GetScript("OnClick")(Panel.stepOnlyBox)
+local function Option(text)
+    for _, line in ipairs(Panel:OptionLines()) do
+        if line.text == text then return line end
+    end
+end
+suite.check("Options has the line", Option("Current Step Only") ~= nil and not Option("Current Step Only").checked)
+Option("Current Step Only").run()
 suite.check("ticking saves it", ns.db.upgradeQuestStepOnly == true and Quest:StepOnly())
 suite.check("and looks for nothing again", scans == 0 and refreshes == 0, scans .. " " .. refreshes)
 
@@ -104,7 +109,7 @@ suite.check("and it is the step to do now", only and rawget(only, "now") == true
 suite.check("the panel is shorter", Panel.frame:GetHeight() < fullHeight,
     Panel.frame:GetHeight() .. " < " .. fullHeight)
 suite.check("the item and buttons stay", Panel.item:IsShown() and Panel.skipButton:IsShown())
-suite.check("the box shows ticked", Panel.stepOnlyBox:GetChecked() == true)
+suite.check("the line shows ticked", Option("Current Step Only").checked == true)
 
 Quest:SetStepOnly(false)
 Panel:Refresh()

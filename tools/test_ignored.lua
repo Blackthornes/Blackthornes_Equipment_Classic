@@ -130,6 +130,6 @@ ns.HandleSlash("quest ignored")
 suite.check("/beq quest ignored opens the list", Ignored.frame:IsShown())
 
 -- Every button reads.
-suite.check("Restore all is a gold button", Ignored.restoreAll.label:GetText() == "Restore all")
+suite.check("Restore all is a gold button", Ignored.restoreAll.label:GetText() == "Restore All")
 
 suite.done()

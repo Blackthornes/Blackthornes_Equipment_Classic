@@ -76,13 +76,13 @@ local toast = ns.Toast
 suite.check("the banner shows both buttons", toast.actions[1]:IsShown() and toast.actions[2]:IsShown())
 suite.check("and no Put it on", not toast.wear:IsShown())
 suite.check("named as given", toast.actions[2].label:GetText() == "Ignore Two-Handed Swords")
-suite.check("a row taller", toast.frame:GetHeight() == 88, toast.frame:GetHeight())
+suite.check("a row taller", toast.frame:GetHeight() == 104, toast.frame:GetHeight())
 suite.check("wide enough for both", toast.frame:GetWidth() >= toast.actions[1]:GetWidth()
-    + toast.actions[2]:GetWidth() + 18, toast.frame:GetWidth())
+    + toast.actions[2]:GetWidth() + 32, toast.frame:GetWidth())
 toast:Dismiss()
 ns.Toast:Show({ title = "Upgrade in your bags", link = "item:3" })
 suite.check("a plain banner hides them again", not toast.actions[1]:IsShown()
-    and toast.frame:GetHeight() == 64)
+    and toast.frame:GetHeight() == 74)
 toast:Dismiss()
 
 -- The banner when it lands in the bags.

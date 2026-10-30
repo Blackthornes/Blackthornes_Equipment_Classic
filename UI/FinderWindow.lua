@@ -43,11 +43,16 @@ local QUEST_ROW = 28
 -- The shortest a row is; a row grows to show its lines in full (a
 -- player's long "where to get it" line was cut, 2026-10-21). The list's
 -- height holds VISIBLE rows at their shortest.
-local ROW_HEIGHT = 50
-local VISIBLE = 9
-local AREA = VISIBLE * ROW_HEIGHT
--- Room for the footer line and a hint that may wrap onto two lines.
+local ROW_HEIGHT = 36
+-- The list's height at its least: what nine two-line rows took before.
+local AREA = 450
+-- One row more than the tallest list holds, so a short row never leaves a gap.
+local VISIBLE = math.ceil((AREA + 60) / ROW_HEIGHT) + 1
+-- Room for the footer line (the count left, the version right).
 local FOOTER = 56
+-- What the footer uses now the click help is on each row's hover; the
+-- rest goes to the list.
+local FOOTER_USED = 30
 local WIDTH = 1040
 
 -- The slots down the left, with what is worn in each, and the gap between
@@ -67,6 +72,8 @@ local CELL_GAP = 10
 -- Queue it, under the gain on crafted rows.
 local QUEUE_WIDTH = 64
 local ICON = 28
+-- How far down a row its first line sits: level with the icon's middle.
+local LINE_TOP = 11
 local TEXT_X = ICON + 18
 local SCROLL_WIDTH = 4
 
@@ -118,7 +125,6 @@ FinderUI.GROUP_OF = GROUP_OF
 -- The slot column's headings (SLOT, YOU WEAR, UP), then each slot's line,
 -- the lines running the list's full height.
 local SLOT_HEAD = 20
-local SLOT_ROW = math.floor((LIST_HEAD + COLUMN_HEAD + AREA - SLOT_HEAD) / #SLOT_GROUPS)
 -- Where what is worn starts on a slot's line, and how wide its name is.
 local WORN_X = 88
 local WORN_ICON = 18
@@ -134,7 +140,7 @@ local TABS = {
     { key = "enchant", text = L["Enchants"] },
     { key = "dungeons", text = L["Dungeon Quests"] },
     { key = "loot", text = L["Dungeon Loot"] },
-    { key = "settings", text = L["Settings"] },
+    { key = "settings", text = L["Settings"], right = true },
 }
 
 -- The tabs whose window stands in for this one, at the same spot: each
@@ -304,6 +310,9 @@ local function ShowEnchantTooltip(row, line)
             or L.Format("Learn it from %s", who)
         GameTooltip:AddLine(where, r, g, b, true)
     end
+    if #FinderUI.EnchantMenu(line) > 0 then
+        GameTooltip:AddLine(L["Right-click for more."], Theme.Unpack("dim"))
+    end
     GameTooltip:Show()
 end
 
@@ -314,6 +323,7 @@ local function ShowOwnedTooltip(row, owned)
     GameTooltip:AddLine(" ")
     if FinderUI.CanPutOn(owned) then
         GameTooltip:AddLine(L["Click to put it on"], Theme.Unpack("good"))
+        GameTooltip:AddLine(L["Right-click for more."], Theme.Unpack("dim"))
     elseif owned.where ~= "bags" and ns.UI then
         GameTooltip:AddLine(ns.UI.WhereText(owned.where), Theme.Unpack("accent"))
     end
@@ -378,12 +388,10 @@ local function ShowTooltip(row)
             GameTooltip:AddLine(L["It becomes your upgrade quest, with steps to get it. A green Quest tag marks it here."], r, g, b, true)
         end
     end
-    local tracked = ns.Tracking and ns.Tracking:IsTracked(pick.itemID)
-    GameTooltip:AddLine(tracked and L["Right-click to stop tracking it"] or L["Right-click to track it"],
-        Theme.Unpack("muted"))
     if FinderUI.Place(pick) then
-        GameTooltip:AddLine(L["Alt-click to pin it on your map"], Theme.Unpack("muted"))
+        GameTooltip:AddLine(L["Alt-click to pin it on your map"], Theme.Unpack("dim"))
     end
+    GameTooltip:AddLine(L["Right-click for more."], Theme.Unpack("dim"))
     GameTooltip:Show()
 end
 
@@ -405,12 +413,12 @@ function FinderUI:BuildRow(index)
     line:SetHeight(1)
     line:SetColorTexture(Theme.Unpack("border", 0.6))
 
-    -- A green edge that lights under the mouse.
+    -- A gold edge that lights under the mouse, as every list's does.
     local edge = row:CreateTexture(nil, "ARTWORK")
     edge:SetPoint("TOPLEFT")
     edge:SetPoint("BOTTOMLEFT")
     edge:SetWidth(2)
-    edge:SetColorTexture(Theme.Unpack("good", 0))
+    edge:SetColorTexture(Theme.Unpack("accentHi", 0))
     row.edge = edge
 
     -- Under the mouse the row lights from the left too: a soft gold wash
@@ -427,24 +435,24 @@ function FinderUI:BuildRow(index)
 
     -- Every line wraps and the row grows to fit, so nothing is cut.
     local item = Theme.CreateLabel(row, "normal", "text")
-    item:SetPoint("TOPLEFT", TEXT_X, -6)
+    item:SetPoint("TOPLEFT", TEXT_X, -LINE_TOP)
     item:SetWidth(ITEM_WIDTH)
     item:SetWordWrap(true)
     row.item = item
 
     local gain = Theme.CreateLabel(row, "normal", "good", "RIGHT")
-    gain:SetPoint("TOPRIGHT", -GAIN_RIGHT, -6)
+    gain:SetPoint("TOPRIGHT", -GAIN_RIGHT, -LINE_TOP)
     gain:SetWidth(GAIN_WIDTH)
     gain:SetWordWrap(true)
     row.gain = gain
 
     local level = Theme.CreateLabel(row, "small", "text")
-    level:SetPoint("TOPRIGHT", -LEVEL_RIGHT, -7)
+    level:SetPoint("TOPRIGHT", -LEVEL_RIGHT, -LINE_TOP - 1)
     level:SetWidth(LEVEL_WIDTH)
     row.level = level
 
     local where = Theme.CreateLabel(row, "small", "text")
-    where:SetPoint("TOPRIGHT", -WHERE_RIGHT, -7)
+    where:SetPoint("TOPRIGHT", -WHERE_RIGHT, -LINE_TOP - 1)
     where:SetWidth(WHERE_WIDTH)
     where:SetWordWrap(true)
     row.where = where
@@ -460,7 +468,7 @@ function FinderUI:BuildRow(index)
 
     -- Queue it, on crafted gear while Tradeskills is loaded: sends the craft,
     -- or what to buy, to Tradeskills' queue (Logic/TradeskillsQueue.lua).
-    local queueIt = Widgets.CreateButton(row, L["Queue it"], function(self)
+    local queueIt = Widgets.CreateButton(row, L["Queue It"], function(self)
         local enchant = rawget(self, "enchant")
         if enchant and ns.Enchants then
             ns.Enchants:Queue(enchant.pick.recipeID)
@@ -478,7 +486,7 @@ function FinderUI:BuildRow(index)
         if enchant and ns.Enchants then
             local source = enchant.source
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(L["Queue it"], Theme.Unpack("accent"))
+            GameTooltip:AddLine(L["Queue It"], Theme.Unpack("accent"))
             local known = source and (source.state == "known" or source.state == "alt")
             local text = known and L["Puts the enchant in Tradeskills' queue."]
                 or (source and source.kit and source.state == "other") and L["Puts it on Tradeskills' shopping list."]
@@ -501,7 +509,7 @@ function FinderUI:BuildRow(index)
 
     -- Show the way, on enchants still to learn: pins the trainer or vendor
     -- through Tradeskills.
-    local showWay = Widgets.CreateButton(row, L["Show the way"], function(self)
+    local showWay = Widgets.CreateButton(row, L["Show the Way"], function(self)
         local enchant = rawget(self, "enchant")
         if not (enchant and ns.Enchants) then return end
         if not ns.Enchants:ShowTheWay(enchant.pick.recipeID) then
@@ -513,7 +521,7 @@ function FinderUI:BuildRow(index)
     row.showWay = showWay
 
     -- Put it on, on an upgrade in your bags: the gold button of the row.
-    local putOn = Widgets.CreateButton(row, L["Put it on"], function(self)
+    local putOn = Widgets.CreateButton(row, L["Put It On"], function(self)
         local owned = rawget(self, "owned")
         if owned and ns.Wear then ns.Wear:PutOn(owned.link) end
     end, { width = 78, height = 20, primary = true })
@@ -529,7 +537,7 @@ function FinderUI:BuildRow(index)
 
     local function Light(p)
         row.background:SetColorTexture(Motion.Mix(row.restKey, "glassHover", p))
-        row.edge:SetColorTexture(Theme.Unpack(rawget(row, "edgeKey") or "good", p))
+        row.edge:SetColorTexture(Theme.Unpack("accentHi", p))
         Theme.LightGradient(wash, "HORIZONTAL", "accent", 0.10, 0, p)
     end
 
@@ -546,6 +554,12 @@ function FinderUI:BuildRow(index)
     end)
     row:SetScript("OnClick", function(self, button)
         if rawget(self, "heading") then return end
+        -- A right-click opens the row's menu (UI/RowMenu.lua), the same in
+        -- every Blackthornes list.
+        if button == "RightButton" then
+            FinderUI:OpenRowMenu(self)
+            return
+        end
         -- Gear you own: Shift-click links it, a click puts on one in your bags.
         local owned = rawget(self, "owned")
         if owned then
@@ -576,11 +590,6 @@ function FinderUI:BuildRow(index)
         end
         local pick = self.pick
         if not pick then return end
-        if button == "RightButton" then
-            if ns.Tracking then ns.Tracking:Toggle(pick) end
-            if rawget(self, "over") == true then ShowTooltip(self) end
-            return
-        end
         local okAlt, alt = pcall(function() return IsAltKeyDown() == true end)
         if okAlt and alt then
             local place = FinderUI.Place(pick)
@@ -602,6 +611,83 @@ function FinderUI:BuildRow(index)
 
     row:Hide()
     return row
+end
+
+--- The menu lines of an enchant row: Queue It and Show the Way.
+function FinderUI.EnchantMenu(line)
+    local Enchants = ns.Enchants
+    local lines = {}
+    if not (Enchants and line) then return lines end
+    if Enchants:CanQueue() then
+        lines[#lines + 1] = { text = L["Queue It"], run = function() Enchants:Queue(line.pick.recipeID) end }
+    end
+    local state = line.source and line.source.state
+    if (state == "learn" or state == "skill") and Enchants:CanShowTheWay(line.pick.recipeID) then
+        lines[#lines + 1] = { text = L["Show the Way"], run = function()
+            if not Enchants:ShowTheWay(line.pick.recipeID) then
+                ns.Print(L["Couldn't find where to learn it."])
+            end
+        end }
+    end
+    return lines
+end
+
+--- The menu lines of a gear row: Follow, Track or Stop Tracking, Show on
+--- Map and Queue It, the plain click's first.
+function FinderUI.PickMenu(pick, sources)
+    local lines = {}
+    local quest = ns.UpgradeQuest
+    if quest then
+        local can = quest.CanFollow(pick)
+        lines[#lines + 1] = { text = L["Follow"], disabled = not can,
+            checked = quest:IsFollowing(pick.itemID), run = function() FinderUI:Follow(pick) end }
+    end
+    if ns.Tracking then
+        local tracked = ns.Tracking:IsTracked(pick.itemID)
+        lines[#lines + 1] = { text = tracked and L["Stop Tracking"] or L["Track"], run = function()
+            ns.Tracking:Toggle(pick)
+            FinderUI:Draw()
+        end }
+    end
+    local place = FinderUI.Place(pick)
+    if place and ns.Waypoints then
+        lines[#lines + 1] = { text = L["Show on Map"], run = function()
+            ns.Waypoints:Show(place, place.name, Theme.ItemIcon(pick.link))
+        end }
+    end
+    local craft = ns.TradeskillsQueue and ns.TradeskillsQueue:Available()
+        and ns.TradeskillsQueue.CraftSource(sources or pick.sources) or nil
+    if craft then
+        lines[#lines + 1] = { text = L["Queue It"], run = function()
+            ns.TradeskillsQueue:Queue(craft)
+            FinderUI:Draw()
+        end }
+    end
+    return lines
+end
+
+--- A right-click on a row: its menu, titled with the item's name.
+function FinderUI:OpenRowMenu(row)
+    if not ns.RowMenu then return end
+    local lines, title
+    local owned, enchant, pick = rawget(row, "owned"), rawget(row, "enchant"), rawget(row, "pick")
+    if owned then
+        lines = {}
+        if FinderUI.CanPutOn(owned) and ns.Wear then
+            lines[1] = { text = L["Put It On"], run = function() ns.Wear:PutOn(owned.link) end }
+        end
+        title = owned.link
+    elseif enchant then
+        lines = FinderUI.EnchantMenu(enchant)
+        title = ns.Enchants and ns.Enchants:ShownName(enchant.pick.recipeID)
+    elseif pick then
+        lines = FinderUI.PickMenu(pick)
+        title = pick.link
+    end
+    if not lines or #lines == 0 then return end
+    if type(title) == "string" then title = title:match("%[(.-)%]") or title end
+    GameTooltip:Hide()
+    ns.RowMenu:Open(lines, { title = title })
 end
 
 function FinderUI:Build()
@@ -667,9 +753,13 @@ function FinderUI:Build()
     self:BuildHeader()
     self:BuildFilters()
 
-    self.listTop = -(HEADER + 10 + FILTERS + QUEST_ROW + 8)
+    -- The list takes what the footer no longer uses, and the filters'
+    -- second line when they fit on one.
+    local twoRows = self.filterRows ~= 1
+    self.area = AREA + (FOOTER - FOOTER_USED) + (twoRows and 0 or QUEST_ROW)
+    self.listTop = -(HEADER + 10 + FILTERS + (twoRows and QUEST_ROW or 0) + 8)
     self.rowsTop = self.listTop - LIST_HEAD - COLUMN_HEAD
-    local listHeight = LIST_HEAD + COLUMN_HEAD + AREA
+    local listHeight = LIST_HEAD + COLUMN_HEAD + self.area
 
     self:BuildSlots(listHeight)
 
@@ -694,7 +784,7 @@ function FinderUI:Build()
     -- in it the view is. On the well, or the well would hide them.
     local track = well:CreateTexture(nil, "ARTWORK")
     track:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING, self.rowsTop)
-    track:SetSize(SCROLL_WIDTH, AREA)
+    track:SetSize(SCROLL_WIDTH, self.area)
     track:SetColorTexture(Theme.Unpack("rowAlt"))
     self.track = track
 
@@ -707,37 +797,34 @@ function FinderUI:Build()
     if ns.BlizzardLook and ns.BlizzardLook.Thumb(thumb) then thumb:SetWidth(SCROLL_WIDTH + 6) end
     self.thumb = thumb
 
-    local empty = Theme.CreateLabel(well, "normal", "muted", "CENTER")
-    empty:SetPoint("TOP", well, "TOP", 0, -(LIST_HEAD + COLUMN_HEAD + 60))
-    empty:SetWidth(INNER - 40)
-    empty:SetWordWrap(true)
+    -- An empty list says why, and offers the next step (Widgets.CreateEmpty).
+    local empty = Widgets.CreateEmpty(well, { width = INNER - 40 })
+    empty:SetPoint("TOP", well, "TOP", 0, -(LIST_HEAD + COLUMN_HEAD + 50))
+    empty:Hide()
     self.empty = empty
 
-    -- The hint wraps (German runs longer), and the footer sits on it.
+    -- The footer (card 5 of the unified look): the count on the left, the
+    -- version small and faint on the right. How to click is on each row's
+    -- hover and each heading's, so the hint line stays empty.
     local hint = Theme.CreateLabel(frame, "tiny", "dim")
     hint:SetPoint("BOTTOMLEFT", PADDING, 10)
-    hint:SetWidth(WIDTH - PADDING * 2)
-    hint:SetWordWrap(true)
+    hint:SetText("")
+    hint:Hide()
+    self.hint = hint
 
-    -- The installed version, small and faint at the right of the footer's
-    -- line, so a player can see at a glance which one they run.
     local version = Theme.CreateLabel(frame, "tiny", "dim", "RIGHT")
-    version:SetPoint("BOTTOMRIGHT", -PADDING, 10)
+    version:SetPoint("BOTTOMRIGHT", -PADDING, 12)
     version:SetText(ns.VersionLabel and ns.VersionLabel() or "")
     self.versionLabel = version
-    hint:SetWidth(WIDTH - PADDING * 2 - 90)
 
     -- How many upgrades in all: in your bags, and to go and get.
     local summary = Theme.CreateLabel(frame, "small", "good")
-    summary:SetPoint("BOTTOMLEFT", hint, "TOPLEFT", 0, 4)
+    summary:SetPoint("BOTTOMLEFT", PADDING, 12)
     self.summary = summary
 
     local footer = Theme.CreateLabel(frame, "small", "text")
-    footer:SetPoint("BOTTOMLEFT", hint, "TOPLEFT", 0, 4)
+    footer:SetPoint("BOTTOMLEFT", PADDING, 12)
     self.footer = footer
-
-    hint:SetText(L["Click a row to follow it. Right-click to track it."])
-    self.hint = hint
 
     -- Upgrades, Enchants, Dungeon Quests, Dungeon Loot and Settings,
     -- hanging under the window.
@@ -761,6 +848,8 @@ function FinderUI:HangTabs(frame, selected)
     end, { hanging = true, width = width })
     strip:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", TAB_INSET, 0)
     strip:Select(selected)
+    -- Kept on the frame, so FitTab keeps Settings flush right as it grows.
+    frame.blackthornesTabs = strip
     return strip
 end
 
@@ -810,8 +899,13 @@ end
 function FinderUI:FitTab(frame)
     if not frame then return end
     local width, height = self:TabSize()
+    local okWidth, oldWidth = pcall(frame.GetWidth, frame)
     frame:SetWidth(width)
     frame:SetHeight(height)
+    local strip = rawget(frame, "blackthornesTabs")
+    if strip and strip.SetRoom and not (okWidth and oldWidth == width) then
+        strip:SetRoom(width - TAB_INSET * 2)
+    end
     if Widgets.ApplySize and ns.db then Widgets.ApplySize(frame, ns.db[FinderUI.SCALE_KEY]) end
 end
 
@@ -911,6 +1005,8 @@ function FinderUI:BuildSlots(height)
         label:SetText(head[2])
     end
     local slotsTop = self.listTop - SLOT_HEAD
+    -- The lines share the list's height.
+    local SLOT_ROW = math.floor((height - SLOT_HEAD) / #SLOT_GROUPS)
 
     self.slotButtons = {}
     for index, group in ipairs(SLOT_GROUPS) do
@@ -1050,8 +1146,17 @@ function FinderUI:BuildColumnHeads()
         heading.label, heading.arrow = label, arrow
 
         heading:SetScript("OnClick", function(self) FinderUI:SortBy(self.key) end)
-        heading:SetScript("OnEnter", function(self) self.label:SetTextColor(Theme.Unpack("accentHi")) end)
-        heading:SetScript("OnLeave", function() FinderUI:PaintHeadings() end)
+        heading:SetScript("OnEnter", function(self)
+            self.label:SetTextColor(Theme.Unpack("accentHi"))
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["Click a heading to sort. Click it again to flip the order, and a third time for best first."],
+                0.42, 0.44, 0.48, true)
+            GameTooltip:Show()
+        end)
+        heading:SetScript("OnLeave", function()
+            FinderUI:PaintHeadings()
+            GameTooltip:Hide()
+        end)
         self.columnHeads[#self.columnHeads + 1] = heading
     end
     self:PaintHeadings()
@@ -1180,11 +1285,55 @@ function FinderUI:BuildHeader()
         ns.UI:OnTrainingToggled()
     end
 
-    -- Stops short of the buttons, so a long spec name never runs under them.
-    local spec = Theme.CreateLabel(header, "small", "muted")
-    spec:SetPoint("LEFT", 58 - RIM, -4)
-    spec:SetPoint("RIGHT", training, "LEFT", -10, 0)
-    self.specLabel = spec
+    -- Judge Gear As: a drop-down past the portrait (card 20 of the unified
+    -- look, 2026-10-29), the same choices and key as Settings > Gear. What
+    -- the old spec line said (level, planning for) is its hover.
+    local judge = Theme.CreateLabel(header, "small", "muted")
+    judge:SetPoint("LEFT", 58 - RIM, -4)
+    judge:SetText(L["Judge Gear As:"])
+    self.judgeLabel = judge
+    local spec = Widgets.CreateChoice(header, {
+        min = 1, max = math.max(1, #FinderUI.SpecChoices()), step = 1, value = 1,
+        format = function(index) return FinderUI.SpecText(index) end,
+        onChange = function(index)
+            local choices = FinderUI.SpecChoices()
+            if ns.SettingsUI and ns.SettingsUI.SetSpec then
+                ns.SettingsUI:SetSpec(choices[index] or "auto")
+            end
+        end,
+    })
+    spec:SetWidth(150)
+    spec:SetPoint("LEFT", judge, "RIGHT", 8, 0)
+    spec:HookScript("OnEnter", function(self)
+        local text = FinderUI.specLabel and FinderUI.specLabel:GetText()
+        if not text or text == "" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["Judge Gear As:"], Theme.Unpack("accent"))
+        GameTooltip:AddLine(text, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    spec:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    self.specChoice = spec
+
+    -- What the old spec line said, kept for the drop-down's hover.
+    local specLine = Theme.CreateLabel(header, "small", "muted")
+    specLine:SetPoint("LEFT", spec, "RIGHT", 10, 0)
+    specLine:Hide()
+    self.specLabel = specLine
+
+    -- Plan ahead: "Now", or a level up to MOST_AHEAD past the character's.
+    -- A tool of the tab, so it sits with the buttons on the right.
+    local ahead = Widgets.CreateChoice(header, {
+        min = 0, max = MOST_AHEAD, step = 1, value = self:Ahead(),
+        format = function(value) return FinderUI.AheadText(value) end,
+        onChange = function(value)
+            if ns.db then ns.db.finderAhead = value end
+            FinderUI.offset = 0
+            FinderUI:Refresh()
+        end,
+    })
+    ahead:SetPoint("RIGHT", training, "LEFT", -10, 0)
+    self.ahead = ahead
 
     -- A gold rule under it, bright at the left and fading out to the right.
     local rule = header:CreateTexture(nil, "ARTWORK")
@@ -1194,65 +1343,84 @@ function FinderUI:BuildHeader()
     Theme.SetGradientAlpha(rule, "HORIZONTAL", "accent", 0.6, 0.05)
 end
 
+--- The spec keys this character can pick from, "auto" first (Settings'
+--- list, so both drop-downs match).
+function FinderUI.SpecChoices()
+    if ns.SettingsUI and ns.SettingsUI.SpecChoices then return ns.SettingsUI:SpecChoices() end
+    return { "auto" }, nil
+end
+
+--- A spec choice's words: "Auto", or the spec's name.
+function FinderUI.SpecText(index)
+    local choices, specs = FinderUI.SpecChoices()
+    local key = choices[index]
+    if key == "auto" or not key or not specs or not specs[key] then return L["Auto"] end
+    return Weights.Label(specs[key].name)
+end
+
+--- The header's drop-down as the character's choice stands; its list
+--- built again when the class's specs came in after the window was built.
+function FinderUI:SyncSpec()
+    local choice = self.specChoice
+    if not choice then return end
+    local choices = FinderUI.SpecChoices()
+    local options = rawget(choice, "options")
+    if type(options) == "table" and #options ~= #choices then
+        for index = #options, 1, -1 do options[index] = nil end
+        for index = 1, #choices do options[index] = { text = FinderUI.SpecText(index), value = index } end
+    end
+    local picked = ns.charDB and ns.charDB.spec
+    local index = 1
+    for i, key in ipairs(choices) do
+        if key == picked then index = i end
+    end
+    choice:SetValue(index, true)
+end
+
+--- The filter row under the header (card 7 of the unified look): the
+--- source chips, then the tick boxes, then Quest Level at the right. When
+--- they don't all fit on one line (German runs longer), the tick boxes and
+--- Quest Level take a second; one line gives the list that row.
 function FinderUI:BuildFilters()
     -- A few pixels lower than the header's foot, clear of the round
     -- portrait above it.
     local topY = -(HEADER + 13)
-    local show = Theme.CreateLabel(self.frame, "small", "muted")
-    show:SetPoint("TOPLEFT", PADDING, topY - 4)
-    show:SetText(L["Show:"])
-    self.showLabel = show
+    local frame = self.frame
 
-    -- The sources, a tick box each: any mix of them, saved as the ones
-    -- turned off (`finderSourcesOff`), so a new kind shows until unticked.
+    -- The sources, a chip each: any mix of them, saved as the ones turned
+    -- off (`finderSourcesOff`), so a new kind shows until unticked.
     self.sourceBoxes = {}
-    local previous = show
+    local x = PADDING
     for _, entry in ipairs(SOURCE_BOXES) do
         local kind = entry[1]
-        local box = Widgets.CreateCheckbox(self.frame, entry[2], function(checked)
-            FinderUI:SetSource(kind, checked)
-        end, self:SourceOn(kind))
-        box:SetPoint("LEFT", previous, "RIGHT", previous == show and 10 or 18, 0)
-        box.kind = kind
-        self.sourceBoxes[#self.sourceBoxes + 1] = box
-        previous = box
+        local chip = Widgets.CreateChip(frame, entry[2], function(picked)
+            FinderUI:SetSource(kind, not picked:IsSelected())
+        end, { selected = self:SourceOn(kind), height = 20 })
+        -- The tick boxes' names, so every caller reads a chip the same way.
+        chip.kind = kind
+        chip.GetChecked = chip.IsSelected
+        chip.SetChecked = chip.SetSelected
+        chip:SetPoint("TOPLEFT", x, topY - 3)
+        x = x + (chip:GetWidth() or 60) + 4
+        self.sourceBoxes[#self.sourceBoxes + 1] = chip
     end
-
-    -- Plan ahead: "Now", or a level up to MOST_AHEAD past the character's.
-    local ahead = Widgets.CreateChoice(self.frame, {
-        min = 0, max = MOST_AHEAD, step = 1, value = self:Ahead(),
-        format = function(value) return FinderUI.AheadText(value) end,
-        onChange = function(value)
-            if ns.db then ns.db.finderAhead = value end
-            FinderUI.offset = 0
-            FinderUI:Refresh()
-        end,
-    })
-    ahead:SetPoint("TOPRIGHT", -PADDING, -(HEADER + 14))
-    self.ahead = ahead
-
-    -- The second row: what to leave out on the left, how far above the
-    -- character a quest may be on the right. The upgrade quest follows the
-    -- quest filters too.
-    local rowY = -(HEADER + 13 + FILTERS + 1)
+    local chipsEnd = x + 14
 
     -- Leave out gear that waits on a reputation not reached yet, or on a
     -- craft nobody of yours can make yet.
-    local now = Widgets.CreateCheckbox(self.frame, L["Only what I can get now"], function(checked)
+    local now = Widgets.CreateCheckbox(frame, L["Only What I Can Get Now"], function(checked)
         FinderUI:SetGetNowOnly(checked)
     end, self:GetNowOnly())
-    now:SetPoint("TOPLEFT", PADDING, rowY - 1)
     self.getNow = now
 
     -- Only gear from the zone the character is in, as the upgrade quest
     -- panel's box of the same name does (each keeps its own setting).
-    local zone = Widgets.CreateCheckbox(self.frame, L["This zone only"], function(checked)
+    local zone = Widgets.CreateCheckbox(frame, L["This Zone Only"], function(checked)
         FinderUI:SetZoneOnly(checked)
     end, self:ZoneOnly())
-    zone:SetPoint("LEFT", now, "RIGHT", 24, 0)
     zone:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["This zone only"], Theme.Unpack("accent"))
+        GameTooltip:AddLine(L["This Zone Only"], Theme.Unpack("accent"))
         GameTooltip:AddLine(L["Only upgrades from the zone you're in, plus gear you can make. The list changes as you travel."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
@@ -1261,13 +1429,12 @@ function FinderUI:BuildFilters()
 
     -- Hide quests that need a group, a dungeon, a raid or a battleground.
     -- The same switch as in Settings.
-    local solo = Widgets.CreateCheckbox(self.frame, L["Solo quests only"], function(checked)
+    local solo = Widgets.CreateCheckbox(frame, L["Solo Quests Only"], function(checked)
         Finder:SetSoloOnly(checked)
     end, Finder:SoloOnly())
-    solo:SetPoint("LEFT", zone, "RIGHT", 24, 0)
     solo:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["Solo quests only"], Theme.Unpack("accent"))
+        GameTooltip:AddLine(L["Solo Quests Only"], Theme.Unpack("accent"))
         GameTooltip:AddLine(L["Hides quests that need a group, and the quests after them. Elite kills count as group quests."],
             1, 1, 1, true)
         GameTooltip:Show()
@@ -1275,26 +1442,43 @@ function FinderUI:BuildFilters()
     solo:HookScript("OnLeave", function() GameTooltip:Hide() end)
     self.solo = solo
 
-    local questLevels = Widgets.CreateChoice(self.frame, {
+    local questLevels = Widgets.CreateChoice(frame, {
         min = 0, max = Finder.QUEST_LEVELS_ANY, step = 1, value = self:QuestLevelsValue(),
         format = function(value) return FinderUI.QuestLevelsText(value) end,
         onChange = function(value) Finder:SetQuestLevelsAbove(value) end,
     })
     questLevels:SetWidth(150)
-    questLevels:SetPoint("TOPRIGHT", -PADDING, rowY)
     questLevels:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["Quest level"], Theme.Unpack("accent"))
+        GameTooltip:AddLine(L["Quest Level:"], Theme.Unpack("accent"))
         GameTooltip:AddLine(L["How far above your level a quest can be."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     questLevels:HookScript("OnLeave", function() GameTooltip:Hide() end)
     self.questLevels = questLevels
 
-    local levelLabel = Theme.CreateLabel(self.frame, "small", "muted", "RIGHT")
+    local levelLabel = Theme.CreateLabel(frame, "small", "muted", "RIGHT")
     levelLabel:SetPoint("RIGHT", questLevels, "LEFT", -10, 0)
-    levelLabel:SetText(L["Quest level"])
+    levelLabel:SetText(L["Quest Level:"])
     self.levelLabel = levelLabel
+
+    -- How wide each tick box is: its box and its words.
+    local function Wide(box)
+        local label = rawget(box, "label")
+        local words = label and label.GetText and label:GetText() or ""
+        return 24 + Theme.TextWidth("small", words)
+    end
+    local ticks = Wide(now) + 24 + Wide(zone) + 24 + Wide(solo)
+    local levelWide = 150 + 10 + Theme.TextWidth("small", L["Quest Level:"]) + 18
+    local room = WIDTH - PADDING * 2
+    self.filterRows = (chipsEnd - PADDING) + ticks + levelWide <= room and 1 or 2
+
+    local rowY = self.filterRows == 1 and topY or -(HEADER + 13 + FILTERS + 1)
+    local tickX = self.filterRows == 1 and chipsEnd or PADDING
+    now:SetPoint("TOPLEFT", tickX, rowY - 1)
+    zone:SetPoint("LEFT", now, "RIGHT", 24, 0)
+    solo:SetPoint("LEFT", zone, "RIGHT", 24, 0)
+    questLevels:SetPoint("TOPRIGHT", -PADDING, rowY)
 end
 
 --- Is "Only what I can get now" ticked? Saved account wide as
@@ -1620,10 +1804,13 @@ end
 --- Grow a filled row to show its lines in full: the name and the line under
 --- it, the Where column, and the gain with Queue it under it.
 function FinderUI:FitRow(row, gear)
-    local height = 6 + TextHeight(row.item, "normal") + 3 + TextHeight(row.source, "tiny") + 8
-    if gear then height = math.max(height, 7 + TextHeight(row.where, "small") + 8) end
+    -- Gear rows are one line; the detail is on the hover. Enchant rows keep
+    -- the line under the name: it is how to get the enchant.
+    local under = row.source:IsShown() and (3 + TextHeight(row.source, "tiny")) or 0
+    local height = LINE_TOP + TextHeight(row.item, "normal") + under + 8
+    if gear then height = math.max(height, LINE_TOP + 1 + TextHeight(row.where, "small") + 8) end
     local buttons = row.queueIt:IsShown() or row.showWay:IsShown()
-    height = math.max(height, 6 + TextHeight(row.gain, "normal") + (buttons and (4 + 18 + 5) or 8))
+    height = math.max(height, LINE_TOP + TextHeight(row.gain, "normal") + (buttons and (4 + 18 + 5) or 8))
     height = math.max(ROW_HEIGHT, math.ceil(height))
     row:SetHeight(height)
     return height
@@ -1746,7 +1933,6 @@ function FinderUI:FillRow(row, line)
     }
     Theme.SetItemIcon(row.icon, line.pick.link)
     row.item:SetWidth(ITEM_WIDTH)
-    row.item:SetText(ns.Items.ShowLink(line.pick.link))
     local gain = Gain(line.pick.result)
     -- A weapon whose skill is not learned yet says "Train" in red, so the
     -- weapon master comes first (a player asked, 2026-10-10).
@@ -1773,13 +1959,17 @@ function FinderUI:FillRow(row, line)
     row.where:SetText(where and FinderUI.MarkZone(where, ns.UpgradeQuest and ns.UpgradeQuest.Zone()) or "")
     row.where:Show()
 
-    local text = FinderUI.SourceLine(line.sources[1])
-    if ns.Tracking and ns.Tracking:IsTracked(line.pick.itemID) then
-        text = Colored("accent", L["Tracking"]) .. "  " .. text
-    end
+    -- One line a row (the house rule, 2026-10-29): where to get it is on
+    -- the hover; only the small tags stay, after the name.
+    local name = ns.Items.ShowLink(line.pick.link)
     if ns.UpgradeQuest and ns.UpgradeQuest:IsFollowing(line.pick.itemID) then
-        text = Colored("good", L["Following"]) .. "  " .. text
+        name = name .. "  " .. Colored("good", L["Following"])
     end
+    if ns.Tracking and ns.Tracking:IsTracked(line.pick.itemID) then
+        name = name .. "  " .. Colored("accent", L["Tracking"])
+    end
+    row.item:SetText(name)
+    local text = FinderUI.SourceLine(line.sources[1])
     if line.pick.needs then
         text = Colored("warn", L.Format("Needs %s with %s", line.pick.needs.standing,
             line.pick.needs.faction)) .. "  " .. text
@@ -1797,10 +1987,11 @@ function FinderUI:FillRow(row, line)
     row.sourceWidth = ITEM_WIDTH
     row.source:SetWidth(row.sourceWidth)
 
-    -- The whole line, wrapped: the row grows to fit it.
+    -- Kept for the hover's first line, never drawn on the row.
     local more = #line.sources - 1
     local tail = more > 0 and L.Format("  +%d more", more) or ""
     row.source:SetText(text .. Colored("dim", tail))
+    row.source:Hide()
     row:Show()
     return self:FitRow(row, true)
 end
@@ -1853,19 +2044,15 @@ function FinderUI:FillOwnedRow(row, owned)
     row.sourceWidth = ITEM_WIDTH
     row.source:SetWidth(ITEM_WIDTH)
     local canPutOn = FinderUI.CanPutOn(owned)
-    if canPutOn then
-        row.source:SetText(Colored("good", L["Click to put it on"]))
-    elseif owned.where ~= "bags" and ns.UI and ns.UI.WhereText then
-        row.source:SetText(Colored("muted", ns.UI.WhereText(owned.where)))
-    else
-        row.source:SetText("")
-    end
+    -- What a click does and where it is are on the hover.
+    row.source:SetText("")
+    row.source:Hide()
     row.putOn.owned = owned
     row.putOn:SetShown(canPutOn)
     row:Show()
     local height = self:FitRow(row, true)
     if canPutOn then
-        height = math.max(height, 6 + TextHeight(row.gain, "normal") + 4 + 20 + 5)
+        height = math.max(height, LINE_TOP + TextHeight(row.gain, "normal") + 4 + 20 + 5)
         row:SetHeight(height)
     end
     return height
@@ -1904,7 +2091,7 @@ function FinderUI:FillEnchantRow(row, line)
     local used = 0
     if Enchants:CanQueue() then
         row.queueIt.enchant = line
-        row.queueIt:SetText(L["Queue it"])
+        row.queueIt:SetText(L["Queue It"])
         row.queueIt:Show()
         used = math.max(QUEUE_WIDTH, row.queueIt:GetWidth() or 0) + 8
     else
@@ -1925,6 +2112,7 @@ function FinderUI:FillEnchantRow(row, line)
     row.sourceWidth = row.fullSourceWidth - used
     row.source:SetWidth(row.sourceWidth)
     row.source:SetText(text)
+    row.source:Show()
     row:Show()
     return self:FitRow(row, false)
 end
@@ -1937,7 +2125,7 @@ function FinderUI:MostOffset()
     local used, index = 0, #lines
     while index >= 1 do
         local height = self:FillRow(self.measureRow, lines[index])
-        if used + height > AREA then break end
+        if used + height > (self.area or AREA) then break end
         used = used + height
         index = index - 1
     end
@@ -1962,7 +2150,7 @@ function FinderUI:Draw()
     for index, row in ipairs(self.rows) do
         local line = not full and lines[offset + index] or nil
         local height = self:FillRow(row, line)
-        if line and index > 1 and used + height > AREA then
+        if line and index > 1 and used + height > (self.area or AREA) then
             row.pick, row.enchant = nil, nil
             row:Hide()
             full = true
@@ -1986,8 +2174,9 @@ function FinderUI:Draw()
     local total = #lines
     local most = self:MostOffset()
     if most > 0 then
-        local size = math.max(16, AREA * shown / math.max(1, total))
-        local top = (AREA - size) * math.min(1, offset / most)
+        local area = self.area or AREA
+        local size = math.max(16, area * shown / math.max(1, total))
+        local top = (area - size) * math.min(1, offset / most)
         self.thumb:SetHeight(size)
         self.thumb:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -PADDING, self.rowsTop - top)
         self.thumb:Show()
@@ -2033,18 +2222,19 @@ function FinderUI:MarkFilters()
     if self.tabStrip then self.tabStrip:Select(enchants and "enchant" or "upgrades") end
     if self.summary then self.summary:SetShown(not enchants) end
     local gear = not enchants
-    local controls = { self.showLabel, self.getNow, self.ahead, self.levelLabel, self.questLevels, self.solo, self.zone }
+    local controls = { self.getNow, self.ahead, self.levelLabel, self.questLevels, self.solo, self.zone }
     for _, box in ipairs(self.sourceBoxes) do controls[#controls + 1] = box end
     for _, heading in ipairs(self.columnHeads or {}) do controls[#controls + 1] = heading end
     for _, control in ipairs(controls) do control:SetShown(gear) end
-    if gear then
-        self.hint:SetText(L["Click a row to follow it. Right-click to track it."] .. "  "
-            .. L["Click a heading to sort. Click it again to flip the order, and a third time for best first."])
-    elseif ns.Enchants and ns.Enchants:CanQueue() then
-        self.hint:SetText(L["The best enchant for each piece you wear, for your spec. Queue it sends it to Tradeskills."])
-    else
-        self.hint:SetText(L["The best enchant for each piece you wear, for your spec."])
-    end
+end
+
+--- Every source ticked again and "Only What I Can Get Now" off: the empty
+--- block's Show All.
+function FinderUI:ShowAll()
+    if not ns.db then return end
+    ns.db.finderSourcesOff = nil
+    for _, box in ipairs(self.sourceBoxes or {}) do box:SetChecked(true) end
+    self:SetGetNowOnly(false)
 end
 
 --- The filters' note after the summary, on the same line, or alone.
@@ -2055,7 +2245,7 @@ function FinderUI:PlaceFooter()
     if type(text) == "string" and text ~= "" then
         footer:SetPoint("LEFT", summary, "RIGHT", 12, 0)
     else
-        footer:SetPoint("BOTTOMLEFT", self.hint, "TOPLEFT", 0, 4)
+        footer:SetPoint("BOTTOMLEFT", PADDING, 12)
     end
 end
 
@@ -2090,6 +2280,7 @@ function FinderUI:Present(found, why)
         self.specLabel:SetText(L.Format("Judging gear as %s, level %d", specName, found.player.level))
     end
     if self.ahead then self.ahead:SetValue(self:Ahead(), true) end
+    self:SyncSpec()
 
     local groups = self:Groups(found)
     self.groups = groups
@@ -2118,7 +2309,15 @@ function FinderUI:Present(found, why)
         elseif found.count == 0 and found.waiting > 0 then
             self.empty:SetText(L["Asking the server about the gear on offer..."])
         elseif here then
-            self.empty:SetText(L.Format("Nothing in %s beats what you wear. Untick This zone only to look anywhere.", here))
+            self.empty:Set(L.Format("Nothing in %s beats what you wear.", here), L["Show All"], function()
+                FinderUI:SetZoneOnly(false)
+            end)
+        elseif (group.total or 0) > 0 then
+            local hiding = group.total or 0
+            self.empty:Set(hiding == 1 and L["Your filters hide 1 more."]
+                or L.Format("Your filters hide %d more.", hiding), L["Show All"], function()
+                FinderUI:ShowAll()
+            end)
         else
             self.empty:SetText(L["Nothing on offer beats what you wear right now."])
         end
@@ -2169,6 +2368,7 @@ function FinderUI:PresentEnchants()
     local specName = spec and Weights:SpecName(class, spec) or ""
     local level = ns.Items and ns.Items:PlayerLevel()
     self.specLabel:SetText(level and L.Format("Judging gear as %s, level %d", specName, level) or specName)
+    self:SyncSpec()
 
     local groups, count = {}, 0
     for _, group in ipairs(SLOT_GROUPS) do groups[group[1]] = { lines = {}, total = 0 } end

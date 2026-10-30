@@ -26,9 +26,13 @@
 -- an upgrade clearly more worth the trip, a gold box at the top offers it:
 -- Switch follows it instead, Keep current leaves the quest as it is. Shift-click the item
 -- to link it in chat. The panel is there while the "Upgrade quest" setting
--- (`upgradeQuest`, off unless turned on) is, folds to its header with "-",
--- and can be dragged anywhere; the spot is kept with the other window
--- positions.
+-- (`upgradeQuest`, off unless turned on) is, folds to its plate with the
+-- house fold gem (UI/FoldWindow.lua, 2026-10-29), and can be dragged
+-- anywhere; the spot is kept with the other window positions. Its choices
+-- (This Zone Only, Change on a New Zone, Solo Quests Only, Current Step
+-- Only, Quest Level and Settings) sit behind one Options button, in the
+-- house row menu (card 20 of the unified look). Transparent is
+-- `questPanelSeeThrough` (UI/SeeThrough.lua).
 
 local _, ns = ...
 local L = ns.L
@@ -49,10 +53,8 @@ local HEADER = HEADER_ROW + 22 + 4
 local TAB_HEIGHT = 24
 local TAB_GAP = 4
 local TABS_HEIGHT = TAB_HEIGHT + 8
--- The filters: two rows of tick boxes and the level stepper.
-local FILTER_ROW = 22
-local FILTER_GAP = 6
-local FILTERS_HEIGHT = FILTER_ROW * 3 + FILTER_GAP * 2 + 8
+-- The filters went behind the Options button (2026-10-29): no rows of their own.
+local FILTERS_HEIGHT = 0
 local PAD = 10
 local ICON = 36
 local MARK = 14
@@ -449,105 +451,64 @@ function QuestPanel.QuestLevelsText(value)
     return tostring(value)
 end
 
---- Under the tabs: "This zone only" and "Solo quests only" on one row;
---- "Change on a new zone" on the next; "Quest level" and the Settings
---- button under it.
--- Made while the panel is built, so the panel's frame is handed in.
-function QuestPanel:BuildFilters(frame)
-    local top = HEADER + TABS_HEIGHT
-    local strip = CreateFrame("Frame", nil, frame)
-    strip:SetPoint("TOPLEFT", 0, -top)
-    strip:SetPoint("TOPRIGHT", 0, -top)
-    strip:SetHeight(FILTERS_HEIGHT)
-    self.filters = strip
-
-    local zone = Widgets.CreateCheckbox(strip, L["This zone only"], function(checked)
-        if ns.UpgradeQuest then ns.UpgradeQuest:SetZoneOnly(checked) end
-    end, ns.UpgradeQuest and ns.UpgradeQuest:ZoneOnly())
-    zone:SetPoint("TOPLEFT", PAD, -2)
-    ExplainBelow(zone, L["This zone only"],
-        L["Only upgrades from the zone you're in. Each tab picks again as you travel. One you picked in Where to get upgrades stays."])
-    self.zoneBox = zone
-
-    -- The same switch as in Where to get upgrades and Settings.
-    local solo = Widgets.CreateCheckbox(strip, L["Solo quests only"], function(checked)
-        if ns.Finder then ns.Finder:SetSoloOnly(checked) end
-    end, ns.Finder and ns.Finder:SoloOnly())
-    solo:SetPoint("LEFT", zone, "RIGHT", 16, 0)
-    ExplainBelow(solo, L["Solo quests only"],
-        L["Hides quests that need a group, and the quests after them. Elite kills count as group quests."])
-    self.soloBox = solo
-
-    -- Whether a new zone changes the quests while This zone only is ticked
-    -- (the owner asked 2026-10-08). Dimmed while This zone only is not.
-    local swap = Widgets.CreateCheckbox(strip, L["Change on a new zone"], function(checked)
-        if ns.UpgradeQuest then ns.UpgradeQuest:SetZoneSwap(checked) end
-    end, not ns.UpgradeQuest or ns.UpgradeQuest:ZoneSwap())
-    swap:SetPoint("TOPLEFT", PAD, -(FILTER_ROW + FILTER_GAP) - 2)
-    ExplainBelow(swap, L["Change on a new zone"],
-        L["With This zone only ticked, each new zone gets new quests."])
-    self.swapBox = swap
-
-    -- Only the step to do now, so the panel takes less room (the owner
-    -- asked 2026-10-13).
-    local stepOnly = Widgets.CreateCheckbox(strip, L["Current step only"], function(checked)
-        if ns.UpgradeQuest then ns.UpgradeQuest:SetStepOnly(checked) end
-    end, ns.UpgradeQuest and ns.UpgradeQuest:StepOnly())
-    stepOnly:SetPoint("LEFT", swap, "RIGHT", 16, 0)
-    ExplainBelow(stepOnly, L["Current step only"],
-        L["The panel shows only the step to do now."])
-    self.stepOnlyBox = stepOnly
-
-    local rowY = -(FILTER_ROW + FILTER_GAP) * 2
-    local levelLabel = Theme.CreateLabel(strip, "small", "muted")
-    levelLabel:SetPoint("TOPLEFT", PAD, rowY - 4)
-    levelLabel:SetText(L["Quest level"])
-    self.levelLabel = levelLabel
-
-    -- As wide as its longest words, measured.
-    local finder = ns.Finder
-    local most = finder and finder.QUEST_LEVELS_ANY or 11
-    local widest = 0
-    for value = 0, most do
-        widest = math.max(widest, Theme.TextWidth("small", QuestPanel.QuestLevelsText(value)))
+--- The Options menu's lines: the same choices as Where to get upgrades and
+--- Settings, each ticked as it stands. A click changes it.
+function QuestPanel:OptionLines()
+    local quest, finder = ns.UpgradeQuest, ns.Finder
+    local lines = {}
+    if quest then
+        local zoneOnly = quest:ZoneOnly()
+        lines[#lines + 1] = { text = L["This Zone Only"], checked = zoneOnly,
+            run = function() quest:SetZoneOnly(not zoneOnly) end }
+        local swap = quest:ZoneSwap()
+        lines[#lines + 1] = { text = L["Change on a New Zone"], checked = swap, disabled = not zoneOnly,
+            run = function() quest:SetZoneSwap(not swap) end }
     end
-    local levels = Widgets.CreateChoice(strip, {
-        min = 0, max = most, step = 1, value = QuestPanel.QuestLevelsValue(),
-        format = function(value) return QuestPanel.QuestLevelsText(value) end,
-        onChange = function(value)
-            if ns.Finder then ns.Finder:SetQuestLevelsAbove(value) end
-        end,
-    })
-    levels:SetWidth(math.max(118, widest + 22 * 2 + 4 * 2 + 16))
-    levels:SetPoint("LEFT", levelLabel, "RIGHT", 8, 0)
-    ExplainBelow(levels, L["Quest level"],
-        L["How far above your level a quest can be."])
-    self.levelStepper = levels
-
-    local settingsText = L["Settings"]
-    local settings = Widgets.CreateButton(strip, settingsText, function()
+    if finder then
+        local solo = finder:SoloOnly()
+        lines[#lines + 1] = { text = L["Solo Quests Only"], checked = solo,
+            run = function() finder:SetSoloOnly(not solo) end }
+    end
+    if quest then
+        local stepOnly = quest:StepOnly()
+        lines[#lines + 1] = { text = L["Current Step Only"], checked = stepOnly,
+            run = function() quest:SetStepOnly(not stepOnly) end }
+    end
+    if finder then
+        lines[#lines + 1] = { text = L["Quest Level:"] .. " " .. QuestPanel.QuestLevelsText(QuestPanel.QuestLevelsValue()),
+            run = function() QuestPanel:OpenLevels() end }
+    end
+    lines[#lines + 1] = { text = L["Settings"], run = function()
         -- Opened on the Upgrade quest page (UI/SettingsPages.lua).
         if ns.db then ns.db.settingsPage = "quest" end
         if ns.SettingsUI then ns.SettingsUI:Show() end
-    end, { width = Theme.TextWidth("small", settingsText) + 24, height = 20 })
-    settings:SetPoint("TOPRIGHT", -PAD, rowY - 1)
-    Explain(settings, L["Settings"], L["Opens the upgrade quest settings."])
-    self.settingsButton = settings
+    end }
+    return lines
 end
 
---- Put the filters back in step with what is saved: any of them can be
---- changed elsewhere too.
-function QuestPanel:FillFilters()
-    if not self.filters then return end
-    self.filters:SetShown(not self.folded)
-    if self.zoneBox then self.zoneBox:SetChecked(ns.UpgradeQuest:ZoneOnly()) end
-    if self.swapBox then
-        self.swapBox:SetChecked(ns.UpgradeQuest:ZoneSwap())
-        self.swapBox:SetAlpha(ns.UpgradeQuest:ZoneOnly() and 1 or 0.45)
+function QuestPanel:OpenOptions()
+    if not ns.RowMenu then return end
+    return ns.RowMenu:Open(self:OptionLines(), { title = L["Options"] })
+end
+
+--- Quest Level's choices, the one set ticked.
+function QuestPanel:LevelLines()
+    local finder = ns.Finder
+    if not finder then return {} end
+    local now = QuestPanel.QuestLevelsValue()
+    local lines = {}
+    for value = 0, finder.QUEST_LEVELS_ANY or 11 do
+        lines[#lines + 1] = { text = QuestPanel.QuestLevelsText(value), checked = value == now,
+            run = function() finder:SetQuestLevelsAbove(value) end }
     end
-    if self.soloBox and ns.Finder then self.soloBox:SetChecked(ns.Finder:SoloOnly()) end
-    if self.stepOnlyBox then self.stepOnlyBox:SetChecked(ns.UpgradeQuest:StepOnly()) end
-    if self.levelStepper then self.levelStepper:SetValue(QuestPanel.QuestLevelsValue(), true) end
+    return lines
+end
+
+function QuestPanel:OpenLevels()
+    if not ns.RowMenu then return end
+    -- The menu closes as a line runs; open the levels once it has.
+    local function Open() ns.RowMenu:Open(QuestPanel:LevelLines(), { title = L["Quest Level:"] }) end
+    if C_Timer and C_Timer.After then C_Timer.After(0, Open) else Open() end
 end
 
 --- The close gem: the upgrade quest goes off, its quests kept.
@@ -578,7 +539,7 @@ function QuestPanel:Build()
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
-    Theme.Fill(frame, "window")
+    frame.fill = Theme.Fill(frame, "window")
 
     -- The house frame, as the gear window wears it: the plate names the
     -- panel and the close gem turns the upgrade quest off.
@@ -589,6 +550,15 @@ function QuestPanel:Build()
         })
         self.trim = trim
         self:ExplainClose(trim)
+        -- The house fold gem, left of the close gem: folds to the plate.
+        if ns.FoldWindow then
+            ns.FoldWindow:Add(frame, {
+                onToggle = function(folded)
+                    QuestPanel.folded = folded and true or false
+                    QuestPanel:Refresh()
+                end,
+            })
+        end
         local left, right, top, bottom = ns.Titanforged.Reach(trim)
         if frame.SetClampRectInsets then frame:SetClampRectInsets(-left, right, top, -bottom) end
     else
@@ -635,18 +605,18 @@ function QuestPanel:Build()
     self.badge = badge
     self.badgeTexture = QUEST_ICON
 
-    local fold = Widgets.CreateButton(header, "-", function() QuestPanel:ToggleFold() end,
-        { width = 22, height = 20 })
-    fold:SetPoint("RIGHT", -PAD, 0)
-    Explain(fold, L["Fold"], L["Shrinks the panel to its header."])
-    self.foldButton = fold
+    local optionsText = L["Options"]
+    local options = Widgets.CreateButton(header, optionsText, function() QuestPanel:OpenOptions() end,
+        { width = Theme.TextWidth("small", optionsText) + 24, height = 20 })
+    options:SetPoint("RIGHT", -PAD, 0)
+    self.optionsButton = options
 
     local title = Theme.CreateLabel(header, "small", "gilt")
     title:SetPoint("LEFT", badge, "RIGHT", 6, 0)
     self.title = title
 
     local progress = Theme.CreateLabel(header, "tiny", "text", "RIGHT")
-    progress:SetPoint("RIGHT", fold, "LEFT", -8, 0)
+    progress:SetPoint("RIGHT", options, "LEFT", -8, 0)
     self.progress = progress
 
     -- A tab for each kind of source.
@@ -654,7 +624,6 @@ function QuestPanel:Build()
     for index, tab in ipairs(ns.UpgradeQuest.TABS) do self.tabs[index] = self:BuildTab(frame, tab) end
     self.tabs[#self.tabs + 1] = self:BuildTab(frame, QuestPanel.LOG_TAB)
     self:LayoutTabs(frame)
-    self:BuildFilters(frame)
     -- The Quest log tab's own list, filters and buttons, in place of the
     -- source tabs' (UI/QuestLogTab.lua).
     if ns.QuestLogUI then ns.QuestLogUI:Build(frame, HEADER + TABS_HEIGHT) end
@@ -673,6 +642,10 @@ function QuestPanel:Build()
     Theme.Recess(well)
     pcall(well.SetFrameLevel, well, math.max(0, (body:GetFrameLevel() or 1) - 1))
     self.well = well
+    if ns.SeeThrough then
+        ns.SeeThrough:AddGlass("quest", frame.fill)
+        ns.SeeThrough:AddGlass("quest", well.background)
+    end
 
     -- A level up opened something better: offered, never swapped in.
     local offer = CreateFrame("Frame", nil, body)
@@ -758,7 +731,7 @@ function QuestPanel:Build()
 
     -- Queue it, at the top right of a crafted upgrade while Tradeskills is
     -- loaded (Logic/TradeskillsQueue.lua).
-    local queueIt = Widgets.CreateButton(item, L["Queue it"], function()
+    local queueIt = Widgets.CreateButton(item, L["Queue It"], function()
         local quest = ns.UpgradeQuest and ns.UpgradeQuest:Current()
         if quest and quest.source and ns.TradeskillsQueue then
             ns.TradeskillsQueue:Queue(quest.source)
@@ -818,9 +791,9 @@ function QuestPanel:Build()
     self.steps = {}
     for index = 1, MOST_STEPS do self.steps[index] = self:BuildStep(index) end
 
-    local map = Widgets.CreateButton(body, L["Show on map"], function() QuestPanel:ShowOnMap() end,
+    local map = Widgets.CreateButton(body, L["Show on Map"], function() QuestPanel:ShowOnMap() end,
         { width = 96, height = 22, primary = true })
-    Explain(map, L["Show on map"], L["Pins the next place to go on your map."])
+    Explain(map, L["Show on Map"], L["Pins the next place to go on your map."])
     self.mapButton = map
 
     -- The quest arrow: lit green while it is up.
@@ -848,6 +821,7 @@ function QuestPanel:Build()
     self.frame = frame
     self:BuildSizeGrip()
     self:RestorePosition()
+    if ns.SeeThrough then ns.SeeThrough:Attach("quest", frame) end
     frame:Hide()
     return frame
 end
@@ -978,7 +952,6 @@ function QuestPanel:Refresh()
     self:Build()
 
     local logic = ns.UpgradeQuest
-    self.foldButton:SetText(self.folded and "+" or "-")
     self:FillTabs()
 
     -- The Quest log tab: its own list in place of the quest's.
@@ -986,7 +959,6 @@ function QuestPanel:Refresh()
         self:SetBadge(QUEST_ICON)
         self.title:SetText(QuestPanel.LOG_TAB.name)
         self.body:Hide()
-        self.filters:Hide()
         local height = HEADER
         if self.folded then
             ns.QuestLogUI:Hide()
@@ -1013,7 +985,6 @@ function QuestPanel:Refresh()
     for _, tab in ipairs(logic.TABS) do
         if tab.key == shownTab then self.title:SetText(tab.name) end
     end
-    self:FillFilters()
 
     local steps, current = {}, 0
     if quest then steps, current = logic:Steps(quest) end
@@ -1242,11 +1213,19 @@ function QuestPanel:ShowOnMap()
 end
 
 function QuestPanel:ToggleFold()
+    if self.frame and ns.FoldWindow and rawget(self.frame, "blackthornesFold")
+        and ns.FoldWindow:Toggle(self.frame) then
+        return
+    end
+    -- Where the gem can't (a window not placed yet): folded to its header.
     self.folded = not self.folded
     self:Refresh()
 end
 
 function QuestPanel:Unfold()
+    if self.frame and ns.FoldWindow and self.folded then
+        ns.FoldWindow:Unfold(self.frame)
+    end
     self.folded = false
     self:Refresh()
 end

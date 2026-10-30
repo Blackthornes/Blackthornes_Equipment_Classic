@@ -67,7 +67,7 @@ local function Texts()
 end
 local text = Texts()
 suite.check("ready now, not priced yet", text:find("READY NOW|price after a trainer visit", 1, true) ~= nil, text)
-suite.check("the ranked spell", text:find("Frostbolt (Rank 2)|not priced yet", 1, true) ~= nil, text)
+suite.check("the ranked spell", text:find("Frostbolt (Rank 2)|Not priced yet", 1, true) ~= nil, text)
 suite.check("the next level", text:find("AT LEVEL 14", 1, true) ~= nil, text)
 suite.check("no trainer seen yet", Drawer.hint:GetText():find("Open a class trainer once", 1, true) ~= nil)
 

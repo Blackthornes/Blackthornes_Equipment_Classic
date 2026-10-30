@@ -3,8 +3,9 @@
 -- dungeons down the left, each with how many of its quests are done, and
 -- the one picked shows its quests: Done, In Log or To Do, who starts each
 -- and where, its level and its reward (green with the gain when it is an
--- upgrade). Follow points the quest arrow, Show the Way puts the game's map
--- pin where it starts. Opened with /beq dungeons, the gear window's
+-- upgrade). Show the Way lays our marker where it starts and points the
+-- quest arrow there (Follow and Show the Way were one button from
+-- 2026-10-29, card 12 of the unified look). Opened with /beq dungeons, the gear window's
 -- Dungeon Quests tab or Settings.
 --
 -- What it shows is DungeonQuests:Build(), built again only on Refresh:
@@ -125,7 +126,7 @@ function DQUI:Build()
     Theme.Fill(frame, "window")
     if ns.Titanforged then
         local trim = ns.Titanforged:Dress(frame, {
-            title = L["Dungeon Quests"],
+            title = "Blackthornes Equipment",
             portrait = true,
             close = function() DQUI:Hide() end,
         })
@@ -345,22 +346,20 @@ function DQUI:BuildQuests()
         self.questRows[index] = row
     end
 
-    -- The foot: where the picked quest starts, and the two buttons.
-    local way = Widgets.CreateButton(well, L["Show the Way"], function()
+    -- The foot: where the picked quest starts, and Show the Way: our marker
+    -- on the map and the arrow (TomTom if picked).
+    local wayText = L["Show the Way"]
+    local way = Widgets.CreateButton(well, wayText, function()
         local quest = DQUI:PickedQuest()
-        if quest then ns.DungeonQuests:ShowTheWay(quest) end
-    end, { width = 110, height = 24, primary = true })
+        if not quest then return end
+        ns.DungeonQuests:ShowTheWay(quest)
+        ns.DungeonQuests:Follow(quest)
+    end, { width = math.max(110, Theme.TextWidth("small", wayText) + 28), height = 24, primary = true })
     way:SetPoint("BOTTOMRIGHT", -12, 10)
     self.wayButton = way
-    local follow = Widgets.CreateButton(well, L["Follow"], function()
-        local quest = DQUI:PickedQuest()
-        if quest then ns.DungeonQuests:Follow(quest) end
-    end, { width = 80, height = 24 })
-    follow:SetPoint("RIGHT", way, "LEFT", -8, 0)
-    self.followButton = follow
     local foot = Theme.CreateLabel(well, "small", "muted")
     foot:SetPoint("BOTTOMLEFT", 14, 16)
-    foot:SetPoint("RIGHT", follow, "LEFT", -10, 0)
+    foot:SetPoint("RIGHT", way, "LEFT", -10, 0)
     foot:SetWordWrap(true)
     self.foot = foot
     local footRule = well:CreateTexture(nil, "ARTWORK")
@@ -588,7 +587,7 @@ function DQUI:FillQuests()
     else
         self.foot:SetText(L["Pick a quest to see where it starts."])
     end
-    for _, button in ipairs({ self.followButton, self.wayButton }) do
+    for _, button in ipairs({ self.wayButton }) do
         button:SetAlpha(place and 1 or 0.45)
         if button.SetEnabled then button:SetEnabled(place ~= nil) end
     end

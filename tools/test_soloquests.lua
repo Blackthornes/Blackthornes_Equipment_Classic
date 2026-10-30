@@ -82,7 +82,7 @@ suite.check("an unknown mark counts as alone", Finder.Need("") == nil and Finder
 local UI = ns.FinderUI
 UI:Show()
 suite.check("the window has the tick box", UI.solo ~= nil and not UI.solo:GetChecked())
-suite.check("named plainly", UI.solo.label:GetText() == "Solo quests only")
+suite.check("named plainly", UI.solo.label:GetText() == "Solo Quests Only")
 UI.solo:GetScript("OnEnter")(UI.solo)
 local tip = table.concat(GameTooltip._lines, "\n")
 suite.check("hovering says what it hides", tip:find("need a group", 1, true) ~= nil, tip)

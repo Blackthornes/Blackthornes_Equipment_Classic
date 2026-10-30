@@ -583,7 +583,7 @@ and `.trackedDone` (never rename them): `Logic/Tracking.lua`,
 client in another language, Classic's map IDs in `Waypoints.ZONE_MAPS`,
 and `Waypoints:DataZone` turns the client's zone name into the data's for
 every "zone you are in" check),
-`UI/SlotUpgrades.lua` (character sheet) and `UI/MoreMarks.lua` (vendor and
+`UI/SlotUpgrades.lua` (character sheet; its Alt-click list wears the gold rim, the slot on the plate and the red close gem, 2026-10-27) and `UI/MoreMarks.lua` (vendor and
 loot arrows). None of it has been seen in game yet; `/beq probe` reports the
 calls they need.
 
@@ -1011,7 +1011,7 @@ spell's cost, WEAPON SKILLS for untrained weapon upgrades in the bags
 characters' on this realm and side (`ClassTraining.SameSide`: each note
 keeps its `realm` and `faction`, an older one takes them from
 `characterGear` or Tradeskills' `Holdings`, else it waits until that
-character logs in; a player saw the other side's, 2026-10-18). Show the way aims the quest arrow at the class trainer
+character logs in; a player saw the other side's, 2026-10-18). The drawer wears the gold rim and red close gem (`Titanforged:Dress` with no plate; the owner, 2026-10-27). Show the way aims the quest arrow at the class trainer
 (`ClassTraining.Guide` = `TrainingDrawer.Guide`). Tested in
 `tools/test_classtraining.lua`. Not yet seen in game.
 A spell is known when the client says so, when a class trainer showed it
@@ -1047,7 +1047,9 @@ change Farmer's XP bar in the same breath.
 
 The owner's goal (2026-10-11): the addons should do the work for the
 player. `Logic/Wear.lua` puts an upgrade on in one click: the upgrade
-banner's **Put it on** button (`UI/Toast.lua`, shown when the banner was
+banner's **Put it on** button (`UI/Toast.lua`, which wears the gold rim and
+red close gem with no plate since 2026-10-27, its buttons in a row below
+the text; shown when the banner was
 made with `wear = true` and `Wear:Can` says yes) and a click on the gear
 window's best-in-bags cell. `Wear:Can` checks combat, that the client has
 `C_Item.EquipItemByName` or `EquipItemByName`, that the item is still in
@@ -1636,6 +1638,58 @@ Equipment. The rule, in every addon:
   `tools/test_notme.lua`, Farmer's `tools/test_goals.lua` and Equipment's
   `tools/test_alts.lua`. This rule is in every addon's notes; keep them the
   same.
+
+## One look across the addons (the house kit)
+
+The owner said build all of it (2026-10-29), from the unified look's
+mockups (22 cards and 9 fixes, `reviews/unified-ui/` in the project
+files). These files are the same in all five addons; a fix to one
+belongs in all five:
+
+- `UI/HouseKit.lua`: `Widgets.CreateViewTabs(parent, tabs, onSelect,
+  opts)` (small tabs on top of a list, one a view: Tradeskills' My Crafts
+  and Your Time, Farmer's This Session and Overall; each as wide as its
+  words, never cut), `Widgets.CreateChip` (the filter chip),
+  `Widgets.CreateEmpty` (the emblem faint, one short line, a gold button
+  when there is a next step: "Clear Search", "Show All") and
+  `Widgets.CreatePanelGems(header, { onFold, onClose })` (the gold fold
+  gem and red close gem for panels that stay up while you play; folded,
+  only the header shows; nothing saved).
+- `UI/RowMenu.lua`: a right-click on any row opens its menu, what a click
+  does first, then the rest. Shift-click and Alt-click still work; what
+  the game guards (a craft, a cast, a sale) stays a button.
+- `UI/Notice.lua`: one note slot under the top of the screen for every
+  addon (`ns.Notice:Show(text, { icon, hold, key })`, signed up in
+  `_G.BlackthornesNotice`), so two notes never land on each other.
+- `UI/SharedChoices.lua`: Text Size, Window Style, Effects, Use TomTom,
+  Guide Me and Arrow Size, changed in one addon, are written to every
+  loaded addon (`_G.BlackthornesSharedChoices`); each keeps its own saved
+  key and name, and nothing moves until the player changes one.
+
+The rules that came with it:
+
+- A list's footer is a count or a result on the left and the version on
+  the right, nothing else. What a click does is the last line, dim, of
+  the row's hover. Settings' footer reads "Changes save as you make them."
+- Settings: the General page holds the look (Window Style, Text Size,
+  Effects, Combine Addon Buttons), TRANSPARENT and ADDONS; Settings is
+  the last tab, flush right.
+- Rows are one line: a second line under a name moves to the hover.
+- A sort picked by a column heading lasts the session; nothing is saved.
+- Buttons are Title Case ("Show the Way", "Queue It", "Got It"), and
+  "Show the Way" is our map marker and the arrow (TomTom when picked).
+- Buttons out on the screen on their own wear the gold plaque
+  (`UI/Plaque.lua`).
+
+Equipment's part (2026-10-29): Upgrade Hunts has Hunts and Done as view
+tabs, a count chip and the panel gems, and a row menu; the Upgrade quest
+panel folds with the house gem and its tick boxes and Quest level sit
+behind one Options button (a row menu). Both panels have Transparent
+("Upgrade Hunts:" and "Upgrade Quest:" on Settings' General page,
+`UI/SeeThrough.lua`, Off unless picked: `huntsSeeThrough`,
+`questPanelSeeThrough`, never rename them). The finder's rows are one
+line, its filters one row, and "Judge Gear As:" is a drop-down in its
+header (the same saved spec). Show the Way does what Follow did too.
 
 ## Writing for players
 

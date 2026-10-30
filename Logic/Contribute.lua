@@ -566,6 +566,8 @@ function Contribute:Alert(line)
         local kits = type(_G.SOUNDKIT) == "table" and _G.SOUNDKIT or {}
         pcall(PlaySound, kits.IG_QUEST_LIST_COMPLETE or 878)
     end
+    -- The house note (UI/Notice.lua), so it never lands on another addon's.
+    if ns.Notice and pcall(ns.Notice.Show, ns.Notice, line, { key = "contribute" }) then return end
     local frame = _G.UIErrorsFrame
     if type(frame) == "table" and type(frame.AddMessage) == "function" then
         pcall(frame.AddMessage, frame, line, 1, 0.82, 0.2, 1)

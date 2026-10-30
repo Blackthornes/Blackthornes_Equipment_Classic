@@ -71,7 +71,7 @@ end
 
 --- The button's words: "Queued" once Tradeskills holds it.
 function TSQueue:Label(itemID)
-    return self:Holds(itemID) and L["Queued"] or L["Queue it"]
+    return self:Holds(itemID) and L["Queued"] or L["Queue It"]
 end
 
 local function Name(itemID)
@@ -88,7 +88,7 @@ end
 --- The button's tooltip: a title and what a click does.
 function TSQueue:Explain(source)
     source = TSQueue.Fresh(source)
-    if not source then return L["Queue it"], nil end
+    if not source then return L["Queue It"], nil end
     if self:Holds(source.itemID) then
         return L["In Tradeskills' queue"], L["Click to open Tradeskills on the Queue tab."]
     end

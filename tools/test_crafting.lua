@@ -264,7 +264,9 @@ local tall = UI:FillRow(UI.measureRow, { pick = UI.lines[1].pick,
     sources = { { kind = "vendor", name = long, zone = "Elwynn Forest" } } })
 suite.check("a line longer than the row still shows in full",
     UI.measureRow.source:GetText():find(long, 1, true) ~= nil and not UI.measureRow.source:GetText():find("...", 1, true))
-suite.check("and the row grows to fit it", tall > 50 and UI.measureRow:GetHeight() == tall, tall)
+-- The source line is kept for the hover now (one line a row); the row
+-- stays one line tall.
+suite.check("and the row stays one line", not UI.measureRow.source:IsShown() and UI.measureRow:GetHeight() == tall, tall)
 UI.measureRow:Hide()
 local colours = {}
 local realAdd = _G.GameTooltip.AddLine

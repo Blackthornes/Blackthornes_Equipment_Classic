@@ -69,7 +69,8 @@ Tracking:Track(questPick)
 suite.check("two hunts", Tracking:Count() == 2 and #Tracking:List() == 2)
 
 suite.check("the tracker shows them", ns.TrackerPanel.frame and ns.TrackerPanel.frame:IsShown())
-suite.check("with a count", ns.TrackerPanel.title:GetText() == "Upgrade hunts (2)", ns.TrackerPanel.title:GetText())
+suite.check("with a count", ns.TrackerPanel.title:GetText() == "Upgrade Hunts"
+    and ns.TrackerPanel.countChip.label:GetText() == "2", ns.TrackerPanel.countChip.label:GetText())
 suite.check("and where to go", ns.TrackerPanel.rows[1].where:GetText():find("Corina Steele", 1, true) ~= nil,
     ns.TrackerPanel.rows[1].where:GetText())
 
@@ -109,11 +110,23 @@ suite.check("no banner with the setting off", ns.Toast:Show({ title = "x" }) == 
 ns.db.upgradeToast = true
 
 ns.TrackerPanel:ToggleDone()
-suite.check("the tracker lists finished hunts", ns.TrackerPanel.title:GetText() == "Finished hunts (1)")
+suite.check("the tracker lists finished hunts", ns.TrackerPanel.tabs.selected == "done"
+    and ns.TrackerPanel.countChip.label:GetText() == "1")
 ns.TrackerPanel:ToggleDone()
-ns.TrackerPanel:ToggleFold()
-suite.check("folding hides the rows", not ns.TrackerPanel.rows[1]:IsShown())
-ns.TrackerPanel:ToggleFold()
+ns.TrackerPanel.gems.fold:GetScript("OnClick")(ns.TrackerPanel.gems.fold)
+suite.check("the fold gem hides the rows", not ns.TrackerPanel.rows[1]:IsShown() and ns.TrackerPanel.folded)
+ns.TrackerPanel.gems.fold:GetScript("OnClick")(ns.TrackerPanel.gems.fold)
+local menuRow = ns.TrackerPanel.rows[1]
+menuRow:GetScript("OnClick")(menuRow, "RightButton")
+local stopLine
+for _, line in ipairs(ns.RowMenu.frame and ns.RowMenu.frame.lines or {}) do
+    if line:IsShown() and line.label:GetText() == "Stop Tracking" then stopLine = line end
+end
+suite.check("right-click opens the hunt's menu", stopLine ~= nil)
+ns.TrackerPanel.gems.close:GetScript("OnClick")(ns.TrackerPanel.gems.close)
+suite.check("the close gem puts it away", not ns.TrackerPanel.frame:IsShown())
+ns.TrackerPanel:OnTrackingChanged()
+suite.check("a change to the hunts brings it back", ns.TrackerPanel.frame:IsShown())
 ns.db.showTracker = false
 ns.TrackerPanel:Refresh()
 suite.check("the tracker hides with its setting off", not ns.TrackerPanel.frame:IsShown())

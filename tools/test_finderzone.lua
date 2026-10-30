@@ -59,7 +59,7 @@ UI:Show()
 suite.check("off, every one from anywhere, best first", Listed() == "1104,1103,1102,1101,1001", Listed())
 
 suite.check("the window has the tick box", UI.zone ~= nil and not UI.zone:GetChecked())
-suite.check("named as on the quest panel", UI.zone.label:GetText() == "This zone only")
+suite.check("named as on the quest panel", UI.zone.label:GetText() == "This Zone Only")
 UI.zone:GetScript("OnEnter")(UI.zone)
 local tip = table.concat(GameTooltip._lines, "\n")
 suite.check("hovering says what it does", tip:find("zone you're in", 1, true) ~= nil, tip)
@@ -79,8 +79,11 @@ suite.check("in Westfall, its four", Listed() == "1104,1103,1102,1101", Listed()
 zone = "Duskwood"
 UI:Refresh()
 suite.check("a zone with nothing lists nothing", Listed() == "", Listed())
-suite.check("and says how to look anywhere", UI.empty:GetText():find("Untick This zone only", 1, true) ~= nil,
-    UI.empty:GetText())
+suite.check("and offers to look anywhere", UI.empty:GetText():find("Nothing in Duskwood", 1, true) ~= nil
+    and UI.empty.button and UI.empty.button:IsShown(), UI.empty:GetText())
+UI.empty.button:GetScript("OnClick")(UI.empty.button)
+suite.check("Show All unticks This Zone Only", ns.db.finderZoneOnly == false)
+UI:SetZoneOnly(true)
 
 UI.zone:GetScript("OnClick")(UI.zone)
 suite.check("unticked, the best from anywhere again", ns.db.finderZoneOnly == false
