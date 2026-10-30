@@ -5,6 +5,9 @@
 local _, ns = ...
 
 ns.WHATS_NEW = {
+    { version = "0.5.0", lines = {
+        "Every window has a new look that matches the other Blackthornes add-ons.",
+    } },
     { version = "0.4.0", lines = {
         "The minimap button has a new Blackthornes badge.",
         "Show on Map now puts a gold marker on your map.",
@@ -13,8 +16,5 @@ ns.WHATS_NEW = {
         "Quest, people, zone and item names now show in your own language.",
         "The Show on Map marker is bigger and easier to spot.",
         "One minimap button now opens all your Blackthornes add-ons.",
-    } },
-    { version = "0.2.0", lines = {
-        "The Take button has a new gold look.",
     } },
 }
