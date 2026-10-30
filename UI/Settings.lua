@@ -845,6 +845,15 @@ function SettingsUI:BuildGeneral()
     end, true)
     controls.combineButtons:SetPoint("TOPLEFT", CONTROL_X, -2)
 
+    -- One window for every Blackthornes addon (UI/SharedWindow.lua, the
+    -- owner, 2026-10-30): off unless ticked, the same in all five. Ticked or
+    -- not, Settings opens again where it now belongs.
+    local oneRow = pages:Row("general", 1, L["One Window:"], nil)
+    controls.oneWindow = Widgets.CreateCheckbox(oneRow, L["On"], function(checked)
+        SettingsUI:SetOneWindow(checked)
+    end, false)
+    controls.oneWindow:SetPoint("TOPLEFT", CONTROL_X, -2)
+
     -- The minimap button always shows (the owner, 2026-10-15); a saved
     -- minimapHidden is kept but no longer read.
     local positionRow = pages:Row("general", 1, L["Window Positions:"],
@@ -1021,6 +1030,8 @@ function SettingsUI:Refresh()
     controls.textSize:Sync()
     controls.windowStyle:Sync()
     controls.combineButtons:SetChecked(not ns.SharedMinimap or ns.SharedMinimap.Combined())
+    local One = ns.FinderUI and ns.FinderUI.One()
+    controls.oneWindow:SetChecked(One ~= nil and One.On() == true)
     controls.effects:SetValue(controls.effectsIndex(), true)
     if ns.SeeThrough then
         for id, choice in pairs(controls.seeThrough or {}) do choice:SetValue(ns.SeeThrough:Level(id), true) end
@@ -1084,6 +1095,9 @@ end
 --------------------------------------------------------------------------------
 
 function SettingsUI:Show()
+    -- With "One Window:" ticked, it opens as a tab of the one window
+    -- (FinderUI:Route).
+    if ns.FinderUI and ns.FinderUI.Route and ns.FinderUI:Route("settings") then return end
     self:Build()
     -- Opened on its own; the Settings tab marks it as standing in after.
     self.asTab = false
@@ -1097,6 +1111,24 @@ function SettingsUI:Show()
     if ns.FoldWindow then ns.FoldWindow:Unfold(self.frame) end
 
     self:Refresh()
+end
+
+--- Tick or untick "One Window:" in every loaded addon, and open Settings
+--- again in the one window, or in its own.
+function SettingsUI:SetOneWindow(on)
+    local Finder = ns.FinderUI
+    local One = Finder and Finder.One()
+    if not One then return end
+    local inside = Finder:Hosted()
+    One.SetOn(on)
+    if on and not inside and self.frame and self.frame:IsShown() then
+        Finder.switching = true
+        self.frame:Hide()
+        Finder.switching = false
+        self:Show()
+    elseif not on and inside then
+        self:Show()
+    end
 end
 
 function SettingsUI:Hide()
