@@ -1011,7 +1011,7 @@ spell's cost, WEAPON SKILLS for untrained weapon upgrades in the bags
 characters' on this realm and side (`ClassTraining.SameSide`: each note
 keeps its `realm` and `faction`, an older one takes them from
 `characterGear` or Tradeskills' `Holdings`, else it waits until that
-character logs in; a player saw the other side's, 2026-10-18). Show the way aims the quest arrow at the class trainer
+character logs in; a player saw the other side's, 2026-10-18). The drawer wears the gold rim and red close gem (`Titanforged:Dress` with no plate; the owner, 2026-10-27). Show the way aims the quest arrow at the class trainer
 (`ClassTraining.Guide` = `TrainingDrawer.Guide`). Tested in
 `tools/test_classtraining.lua`. Not yet seen in game.
 A spell is known when the client says so, when a class trainer showed it
@@ -1047,7 +1047,9 @@ change Farmer's XP bar in the same breath.
 
 The owner's goal (2026-10-11): the addons should do the work for the
 player. `Logic/Wear.lua` puts an upgrade on in one click: the upgrade
-banner's **Put it on** button (`UI/Toast.lua`, shown when the banner was
+banner's **Put it on** button (`UI/Toast.lua`, which wears the gold rim and
+red close gem with no plate since 2026-10-27, its buttons in a row below
+the text; shown when the banner was
 made with `wear = true` and `Wear:Can` says yes) and a click on the gear
 window's best-in-bags cell. `Wear:Can` checks combat, that the client has
 `C_Item.EquipItemByName` or `EquipItemByName`, that the item is still in

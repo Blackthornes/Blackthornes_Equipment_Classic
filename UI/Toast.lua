@@ -2,12 +2,14 @@
 -- A banner near the top of the screen when something worth a cheer happens:
 -- an upgrade lands in the bags, a tracked upgrade is got, a hunt is done.
 --
--- House style: the dark shell with the gold halo, the item's icon in its
--- quality colour, a title in gold and the item below. It drops in, glows,
--- waits, and fades. Click it to open the upgrade finder; the X closes it.
+-- House style: the gold rim and the red close gem (Titanforged, no plate),
+-- the item's icon in its quality colour, a title in gold and the item below.
+-- It drops in, glows, waits, and fades. Click it to open the upgrade finder;
+-- the gem closes it.
 -- An upgrade in the bags gets a Put it on button (Logic/Wear.lua). A banner
 -- can carry its own buttons instead (`actions`, up to two, each { text, fn }),
 -- in a row along its foot: an untrained weapon's Show the trainer and Ignore.
+-- Put it on sits in that row too, so the line above it keeps its width.
 -- Several at once wait their turn. Switched off with the "Upgrade banner"
 -- setting (`upgradeToast`); the chat line has its own switch.
 
@@ -20,14 +22,17 @@ local Theme = ns.Theme
 local Widgets = ns.Widgets
 local Motion = ns.Motion
 
-local WIDTH = 330
-local HEIGHT = 64
+local WIDTH = 340
+local HEIGHT = 74
 local ICON = 40
+-- Room kept clear at the top right for the close gem.
+local GEM_ROOM = 28
 local SHOWN_FOR = 6
 local QUEUE_MOST = 4
 local ACTIONS_MOST = 2
--- The row of a banner's own buttons adds this much height.
-local ACTION_ROW = 24
+-- The row of buttons (Put it on, or a banner's own) adds this much height.
+local ACTION_ROW = 30
+local BUTTON_HEIGHT = 22
 
 function Toast:IsEnabled()
     return not (ns.db and ns.db.upgradeToast == false)
@@ -41,38 +46,44 @@ function Toast:Build()
     frame:SetPoint("TOP", UIParent, "TOP", 0, -150)
     frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true)
-    Theme.Window(frame)
-    Theme.AccentStripe(frame, 3)
+    Theme.Fill(frame, "window")
+    -- The gold rim and the red close gem, as the house windows wear them;
+    -- no plate or portrait, so it stays a banner.
+    if ns.Titanforged then
+        self.trim = ns.Titanforged:Dress(frame, { close = function() Toast:Dismiss() end })
+        local left, right, top, bottom = ns.Titanforged.Reach(self.trim)
+        if frame.SetClampRectInsets then frame:SetClampRectInsets(-left, right, top, -bottom) end
+    else
+        Theme.Border(frame, "borderLit")
+    end
+    -- The glow that flares as it drops in.
+    Theme.Halo(frame, 10, 0.14)
 
     local icon = Theme.CreateItemIcon(frame, ICON)
-    icon:SetPoint("LEFT", 12, 0)
+    icon:SetPoint("TOPLEFT", 14, -14)
     self.icon = icon
 
     local title = Theme.CreateLabel(frame, "small", "accent")
     title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 10, -1)
-    title:SetWidth(WIDTH - ICON - 60)
+    title:SetWidth(WIDTH - ICON - 34 - GEM_ROOM)
     self.title = title
 
     local item = Theme.CreateLabel(frame, "normal", "text")
     item:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-    item:SetWidth(WIDTH - ICON - 40)
+    item:SetWidth(WIDTH - ICON - 48)
     self.item = item
 
-    local text = Theme.CreateLabel(frame, "tiny", "muted")
+    local text = Theme.CreateLabel(frame, "small", "muted")
     text:SetPoint("TOPLEFT", item, "BOTTOMLEFT", 0, -3)
-    text:SetWidth(WIDTH - ICON - 40)
+    text:SetWidth(WIDTH - ICON - 48)
     self.text = text
-
-    local close = Widgets.CreateButton(frame, "X", function() Toast:Dismiss() end,
-        { width = 18, height = 16, danger = true })
-    close:SetPoint("TOPRIGHT", -6, -6)
 
     -- An upgrade in the bags can be put on from here, out of combat.
     local wear = Widgets.CreateButton(frame, L["Put it on"], function()
         local link = rawget(Toast, "link")
         if link and ns.Wear:PutOn(link) then Toast:Dismiss() end
-    end, { width = 76, height = 18, primary = true })
-    wear:SetPoint("BOTTOMRIGHT", -6, 6)
+    end, { width = 90, height = BUTTON_HEIGHT, primary = true })
+    wear:SetPoint("BOTTOMRIGHT", -12, 10)
     wear:Hide()
     self.wear = wear
 
@@ -83,11 +94,11 @@ function Toast:Build()
             local fn = button.fn
             Toast:Dismiss()
             if type(fn) == "function" then pcall(fn) end
-        end, { width = 60, height = 18, primary = index == 1 })
+        end, { width = 80, height = BUTTON_HEIGHT, primary = index == 1 })
         if index == 1 then
-            button:SetPoint("BOTTOMRIGHT", -6, 6)
+            button:SetPoint("BOTTOMRIGHT", -12, 10)
         else
-            button:SetPoint("RIGHT", self.actions[index - 1], "LEFT", -6, 0)
+            button:SetPoint("RIGHT", self.actions[index - 1], "LEFT", -8, 0)
         end
         button:Hide()
         self.actions[index] = button
@@ -153,14 +164,13 @@ function Toast:Present(banner)
             button:Hide()
         end
     end
-    -- The last line stops short of Put it on; a row of buttons sits below.
-    self.text:SetWidth(WIDTH - ICON - 40 - (wears and 84 or 0))
-    self.frame:SetHeight(HEIGHT + (#actions > 0 and ACTION_ROW or 0))
+    -- Put it on, or the banner's own buttons, sit in a row below the text.
+    self.frame:SetHeight(HEIGHT + ((wears or #actions > 0) and ACTION_ROW or 0))
     -- A long weapon name ("Ignore Two-Handed Swords") widens the banner
     -- rather than squeezing a label.
-    local row = 12
+    local row = 24
     for _, button in ipairs(self.actions) do
-        if button:IsShown() then row = row + (tonumber(button:GetWidth()) or 0) + 6 end
+        if button:IsShown() then row = row + (tonumber(button:GetWidth()) or 0) + 8 end
     end
     self.frame:SetWidth(math.max(WIDTH, row))
 

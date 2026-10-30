@@ -24,7 +24,7 @@ local WIDTH = 300
 local PADDING = 14
 local ROW = 20
 local ICON = 16
-local FOOT = 44
+local FOOT = 50
 
 -- How many lines the drawer holds; past that, one says how many more. Its
 -- well is 384 pixels tall, so 19 rows of 20 fit and a 20th spilled over the
@@ -155,16 +155,18 @@ function Drawer:Build()
     frame:SetPoint("BOTTOMLEFT", window, "BOTTOMRIGHT", 4, 24)
     frame:EnableMouse(true)
     Theme.Fill(frame, "window")
-    Theme.Border(frame, "borderLit")
+    -- The gold rim and the red close gem, as the gear window beside it.
+    if ns.Titanforged then
+        self.trim = ns.Titanforged:Dress(frame, { close = function() Drawer:Hide() end })
+    else
+        Theme.Border(frame, "borderLit")
+    end
     Theme.Halo(frame, 10, 0.12)
 
     local title = Theme.CreateLabel(frame, "normal", "accent")
     title:SetPoint("TOPLEFT", PADDING, -12)
-    title:SetText(L["Class training"])
+    title:SetText(L["CLASS TRAINING"])
     self.title = title
-
-    local close = Widgets.CreateButton(frame, "x", function() Drawer:Hide() end, { width = 20, height = 18 })
-    close:SetPoint("TOPRIGHT", -8, -8)
 
     local sub = Theme.CreateLabel(frame, "small", "muted")
     sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
@@ -193,12 +195,12 @@ function Drawer:Build()
     way:SetPoint("BOTTOMRIGHT", -PADDING, 12)
     self.wayButton = way
 
-    local hint = Theme.CreateLabel(frame, "tiny", "dim")
-    hint:SetPoint("BOTTOMLEFT", PADDING, 12)
+    local hint = Theme.CreateLabel(frame, "small", "dim")
+    hint:SetPoint("BOTTOMLEFT", PADDING, 10)
     hint:SetPoint("RIGHT", way, "LEFT", -8, 0)
     hint:SetWordWrap(true)
     hint:SetJustifyV("BOTTOM")
-    hint:SetHeight(28)
+    hint:SetHeight(34)
     self.hint = hint
 
     frame:Hide()
@@ -222,7 +224,7 @@ function Drawer:Lines()
             right = training.CostText(plan.cost, plan.unknown, #plan.ready) }
         for _, spell in ipairs(plan.ready) do
             lines[#lines + 1] = { text = training.Label(spell.entry), icon = training.Icon(spell.entry), spell = spell,
-                right = spell.cost and training.Money(spell.cost) or L["not priced yet"] }
+                right = spell.cost and training.Money(spell.cost) or L["Not priced yet"] }
         end
     else
         lines[#lines + 1] = { heading = true, text = L["READY NOW"] }
@@ -234,7 +236,7 @@ function Drawer:Lines()
             right = training.CostText(plan.nextCost, plan.nextUnknown, #plan.next) }
         for _, spell in ipairs(plan.next) do
             lines[#lines + 1] = { text = training.Label(spell.entry), icon = training.Icon(spell.entry), spell = spell,
-                right = spell.cost and training.Money(spell.cost) or L["not priced yet"], color = "muted" }
+                right = spell.cost and training.Money(spell.cost) or L["Not priced yet"], color = "muted" }
         end
     end
 

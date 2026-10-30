@@ -934,6 +934,7 @@ L["list the class spells you can train and what they cost (training on|off to tu
 L["no %s trainer seen yet. Open one once and it's remembered."] = "aucun maître %s vu pour l'instant. Ouvre-en un une fois et il est retenu."
 L["no class spells to train right now."] = "aucun sort de classe à apprendre pour l'instant."
 L["not priced yet"] = "pas encore de prix"
+L["Not priced yet"] = "Pas encore de prix"
 L["price after a trainer visit"] = "prix après une visite au maître"
 L["the game wouldn't train it from here. Click Train in the trainer's window."] = "le jeu ne veut pas l'apprendre d'ici. Clique sur Apprendre dans la fenêtre du maître."
 L["trained %d spells for %s."] = "%d sorts appris pour %s."

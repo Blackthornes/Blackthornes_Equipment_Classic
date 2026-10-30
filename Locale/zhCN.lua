@@ -934,6 +934,7 @@ L["list the class spells you can train and what they cost (training on|off to tu
 L["no %s trainer seen yet. Open one once and it's remembered."] = "还没见过%s训练师。打开一次就会记住。"
 L["no class spells to train right now."] = "现在没有要学的职业法术。"
 L["not priced yet"] = "还没有价格"
+L["Not priced yet"] = "还没有价格"
 L["price after a trainer visit"] = "找过训练师后才有价格"
 L["the game wouldn't train it from here. Click Train in the trainer's window."] = "游戏不让在这里学。在训练师窗口里点击训练。"
 L["trained %d spells for %s."] = "花%2$s学了 %1$d 个法术。"
