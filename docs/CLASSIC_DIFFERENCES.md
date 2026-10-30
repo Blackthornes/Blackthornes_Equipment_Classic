@@ -172,3 +172,7 @@ next gear or level change. They hear Era's too now (`Finder:OnEnable`,
   methods) are all in Era, so nothing needed a fallback.
 - No Arrow Size here: the shared choice is heard and left alone.
 
+## The one window
+
+- `UI/SharedWindow.lua` is Classic's own (2026-10-30); Forever has no copy
+  yet. Nothing shows until "One Window:" is ticked.
