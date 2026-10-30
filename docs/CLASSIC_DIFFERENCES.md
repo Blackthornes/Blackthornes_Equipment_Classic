@@ -179,5 +179,5 @@ next gear or level change. They hear Era's too now (`Finder:OnEnable`,
 - Equipment's gear window and its Dungeon Quests, Dungeon Loot and Settings
   tabs move into it when ticked (`FinderUI.host`, `Route`, `Closed`);
   Forever's FinderWindow has none of it.
-- Docking beside the mailbox, vendor and trainer (2026-10-30) is in the
+- Docking beside the auction house, mailbox, vendor and trainer (2026-10-30) is in the
   shared file, so Forever has none of it either.
