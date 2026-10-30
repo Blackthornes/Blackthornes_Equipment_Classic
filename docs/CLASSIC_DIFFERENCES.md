@@ -175,7 +175,8 @@ next gear or level change. They hear Era's too now (`Finder:OnEnable`,
 ## The one window
 
 - `UI/SharedWindow.lua` is Classic's own (2026-10-30); Forever has no copy
-  yet. Nothing shows until "One Window:" is ticked.
+  yet. "One Window:" is on unless unticked (2026-10-30). At the auction
+  house only Tradeskills shows in it.
 - Equipment's gear window and its Dungeon Quests, Dungeon Loot and Settings
   tabs move into it when ticked (`FinderUI.host`, `Route`, `Closed`);
   Forever's FinderWindow has none of it.
