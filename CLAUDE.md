@@ -1202,6 +1202,21 @@ rename them: `oneWindow`, `oneWindowAt` (the newest wins), `oneWindowPick`,
 & Loot, arrows, plaques, loot feed, XP bar) stay their own. Tested in
 `tools/test_sharedwindow.lua`. Not yet seen in game.
 
+Equipment's tabs are in (2026-10-30, after Butler's and Pets'): "One
+Window:" sits on the General page (`SettingsUI:SetOneWindow`, writing
+every save). Equipment joins with `host = FinderUI.host`;
+`FinderUI:Enter(area)` lays the gear window and its stand-ins (Dungeon
+Quests, Dungeon Loot, Settings) into the area (`LayIn`: parented to it,
+filling it, scale 1, their own trim, size grip and rim put out of sight;
+the hanging tabs under the one window's edge) and grows the one window to
+the shared size (`Grow`); `Leave` gives them back their place, size and
+scale (`LayOut`). `FinderUI:Show` and each stand-in's `Show` ask
+`FinderUI:Route` first, which opens the one window on Equipment when it is
+ticked, or, already inside, goes through `ShowTab`; a tab closing by
+itself closes the one window (`FinderUI:Closed`, skipped while
+`switching` or `leaving`). The upgrade quest panel, the training drawer
+and the hunts panel stay their own. Tested in `tools/test_onewindow.lua`.
+
 ## The shared minimap button
 
 A player asked, the owner said build it from a mockup (2026-10-28), in all

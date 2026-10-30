@@ -612,6 +612,9 @@ function DQUI:RestorePosition()
 end
 
 function DQUI:Show()
+    -- With "One Window:" ticked, it opens as a tab of the one window
+    -- (FinderUI:Route).
+    if ns.FinderUI and ns.FinderUI.Route and ns.FinderUI:Route("dungeons") then return end
     self:Build()
     if not self.frame:IsShown() then
         if ns.FinderUI then ns.FinderUI:FitTab(self.frame) end

@@ -219,8 +219,10 @@ function MinimapButton:JoinShared()
         ns.SharedWindow:Join({
             key = "equipment", order = 4, name = "Equipment", icon = ICON,
             open = function() MinimapButton:Open() end,
-            settings = function() if ns.SettingsUI then ns.SettingsUI:Toggle() end end,
+            settings = function() if ns.SettingsUI then ns.SettingsUI:Show() end end,
             db = function() return ns.db end,
+            -- Every tab shows in it (UI/FinderWindow.lua).
+            host = ns.FinderUI and ns.FinderUI.host or nil,
         })
     end
 end

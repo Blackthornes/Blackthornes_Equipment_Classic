@@ -850,6 +850,8 @@ function FinderUI:HangTabs(frame, selected)
     strip:Select(selected)
     -- Kept on the frame, so FitTab keeps Settings flush right as it grows.
     frame.blackthornesTabs = strip
+    -- Inside the one window, it closes with this one.
+    if frame.HookScript then frame:HookScript("OnHide", function() FinderUI:Closed() end) end
     return strip
 end
 
@@ -898,6 +900,12 @@ end
 --- Give one tab's window the shared size and scale.
 function FinderUI:FitTab(frame)
     if not frame then return end
+    -- Inside the one window it fills the area, which grows instead.
+    if self.oneArea then
+        self:LayIn(frame)
+        self:Grow()
+        return
+    end
     local width, height = self:TabSize()
     local okWidth, oldWidth = pcall(frame.GetWidth, frame)
     frame:SetWidth(width)
@@ -932,6 +940,8 @@ end
 
 --- A size grip dragged on one tab: the others take the same scale.
 function FinderUI:ScaleChanged()
+    -- The one window has its own scale.
+    if self.oneArea then return end
     for _, frame in ipairs(self:TabFrames()) do
         if Widgets.ApplySize and ns.db then Widgets.ApplySize(frame, ns.db[FinderUI.SCALE_KEY]) end
     end
@@ -951,6 +961,16 @@ end
 --- Enchants show this window, the others show their own window in its
 --- place, at the same spot, and every other window of the tabs goes.
 function FinderUI:ShowTab(key)
+    if not self.oneArea and self:Route(key) then return end
+    local was, wasIn = self.switching, self.inShowTab
+    self.switching, self.inShowTab = true, true
+    local ok, err = pcall(self.ShowTabNow, self, key)
+    self.switching, self.inShowTab = was, wasIn
+    if not ok then error(err, 0) end
+end
+
+--- ShowTab's work, while the tabs being put away say so (`switching`).
+function FinderUI:ShowTabNow(key)
     local current = self:ShownTabWindow()
     local x, y
     if current then x, y = Corner(current) end
@@ -966,7 +986,7 @@ function FinderUI:ShowTab(key)
         standIn:Show()
         local frame = StandInFrame(STAND_INS[key])
         self:FitTab(frame)
-        if current and not wasShown and frame then PlaceAt(frame, x, y) end
+        if current and not wasShown and frame and not self.oneArea then PlaceAt(frame, x, y) end
         standIn.asTab = true
         local strip = rawget(standIn, "tabStrip")
         if strip then strip:Select(key) end
@@ -978,7 +998,7 @@ function FinderUI:ShowTab(key)
     local wasShown = Shown(self.frame)
     self:Show()
     self:FitTab(self.frame)
-    if current and not wasShown then PlaceAt(self.frame, x, y) end
+    if current and not wasShown and not self.oneArea then PlaceAt(self.frame, x, y) end
     if self.tabStrip then self.tabStrip:Select(key == "enchant" and "enchant" or "upgrades") end
 end
 
@@ -2458,10 +2478,13 @@ function FinderUI:RestorePosition()
 end
 
 function FinderUI:Show()
+    -- With "One Window:" ticked, the one window opens on Equipment instead,
+    -- and lays this window in.
+    if self:Route(ns.db and ns.db.finderShow == "enchant" and "enchant" or "upgrades") then return end
     self:Build()
     if not self.frame:IsShown() then
+        if not self.oneArea then self:RestorePosition() end
         self:FitTab(self.frame)
-        self:RestorePosition()
         self.offset = 0
         -- A new look: the slot last clicked if it has something, else the
         -- first that does.
@@ -2539,4 +2562,203 @@ function FinderUI:OnEnable()
     ns.RegisterEvent(self, "PLAYER_MONEY", function()
         if FinderUI.frame and FinderUI.frame:IsShown() then FinderUI:Draw() end
     end)
+end
+
+--------------------------------------------------------------------------------
+-- The one window
+--
+-- With "One Window:" ticked (UI/SharedWindow.lua, the owner said build it,
+-- 2026-10-30), every tab (Upgrades, Enchants, Dungeon Quests, Dungeon Loot,
+-- Settings) shows inside the one Blackthornes window: each window is laid
+-- into its area, filling it, without its own rim, plate, portrait, gems or
+-- size grip, since the one window has its own. The tabs still hang below,
+-- under the one window's edge. Unticked, or when another addon is picked on
+-- the rail, they go back to their own place, size and scale. The Training
+-- drawer still opens against the gear window's right edge.
+--------------------------------------------------------------------------------
+
+-- The one window's area while the tabs are in it, else nil.
+FinderUI.oneArea = nil
+-- The tab to show when the one window lays Equipment in.
+FinderUI.wanted = nil
+-- True while a tab steps aside for another, and while the tabs go back,
+-- so their OnHide does not close the one window too.
+FinderUI.switching = false
+FinderUI.leaving = false
+
+--- The copy of the one window that draws it, or nil.
+function FinderUI.One()
+    local SharedWindow = ns.SharedWindow
+    if not (SharedWindow and SharedWindow.Drawer) then return nil end
+    local ok, drawer = pcall(SharedWindow.Drawer)
+    local api = ok and type(drawer) == "table" and drawer.api or nil
+    return type(api) == "table" and api or nil
+end
+
+--- True while the tabs show in the one window.
+function FinderUI:Hosted()
+    return self.oneArea ~= nil
+end
+
+-- The module that keeps a tab's window, for its size grip.
+local function ModuleOf(frame)
+    if frame == FinderUI.frame then return FinderUI end
+    for _, name in pairs(STAND_INS) do
+        if StandInFrame(name) == frame then return ns[name] end
+    end
+    return nil
+end
+
+-- What a window wears, put out of sight inside the one window and back
+-- after: the trim (plate, portrait, close and fold gems, corners), the size
+-- grip and the rim drawn on the frame itself.
+local function Bare(frame, bare)
+    local trim = rawget(frame, "titan")
+    if trim and trim.SetShown then trim:SetShown(not bare) end
+    local module = ModuleOf(frame)
+    local grip = module and rawget(module, "sizeGrip")
+    if grip and grip.SetShown then grip:SetShown(not bare) end
+    if bare then
+        if rawget(frame, "bareRim") then return end
+        local kept = {}
+        local ok, regions = pcall(function() return { frame:GetRegions() } end)
+        for _, region in ipairs(ok and regions or {}) do
+            local okLayer, layer = pcall(region.GetDrawLayer, region)
+            if okLayer and layer == "BORDER" and region:IsShown() then
+                region:Hide()
+                kept[#kept + 1] = region
+            end
+        end
+        frame.bareRim = kept
+        pcall(frame.RegisterForDrag, frame)
+    else
+        for _, region in ipairs(rawget(frame, "bareRim") or {}) do region:Show() end
+        frame.bareRim = nil
+        pcall(frame.RegisterForDrag, frame, "LeftButton")
+    end
+end
+
+--- Lay one tab's window into the area, filling it.
+function FinderUI:LayIn(frame)
+    local area = self.oneArea
+    if not (frame and area) then return end
+    if frame:GetParent() ~= area then frame:SetParent(area) end
+    frame:ClearAllPoints()
+    frame:SetAllPoints(area)
+    frame:SetScale(1)
+    Bare(frame, true)
+    local strip = rawget(frame, "blackthornesTabs")
+    if strip then
+        -- Hung from the one window's own bottom edge, not the area's.
+        local one = area:GetParent()
+        local drop = 8
+        if one then
+            local okA, a = pcall(area.GetBottom, area)
+            local okO, o = pcall(one.GetBottom, one)
+            if okA and okO and type(a) == "number" and type(o) == "number" then drop = a - o end
+        end
+        strip:ClearAllPoints()
+        strip:SetPoint("TOPLEFT", area, "BOTTOMLEFT", TAB_INSET, -drop)
+        local ok, width = pcall(area.GetWidth, area)
+        if ok and type(width) == "number" and width > 0 and strip.SetRoom then
+            strip:SetRoom(width - TAB_INSET * 2)
+        end
+    end
+end
+
+--- Give one tab's window back its own place, size and scale.
+function FinderUI:LayOut(frame)
+    if not frame then return end
+    frame:SetParent(UIParent)
+    Bare(frame, false)
+    local strip = rawget(frame, "blackthornesTabs")
+    if strip then
+        strip:ClearAllPoints()
+        strip:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", TAB_INSET, 0)
+    end
+    local module = ModuleOf(frame)
+    if module and module.RestorePosition then
+        pcall(module.RestorePosition, module)
+    else
+        frame:ClearAllPoints()
+        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+    end
+    -- FitTab keeps the tabs' room unless the width moved, so ask afresh.
+    frame:SetWidth(1)
+    self:FitTab(frame)
+end
+
+--- Grow the one window until its area holds the size every tab shares.
+function FinderUI:Grow()
+    local area = self.oneArea
+    local one = area and area:GetParent()
+    if not one then return end
+    local width, height = self:TabSize()
+    local okW, areaW = pcall(area.GetWidth, area)
+    local okH, areaH = pcall(area.GetHeight, area)
+    if okW and type(areaW) == "number" and areaW > 0 and areaW < width then
+        one:SetWidth(one:GetWidth() + (width - areaW))
+    end
+    if okH and type(areaH) == "number" and areaH > 0 and areaH < height then
+        one:SetHeight(one:GetHeight() + (height - areaH))
+    end
+end
+
+--- The tabs go into the one window: called by it (host.enter).
+function FinderUI:Enter(area)
+    if not area then return end
+    self.oneArea = area
+    for _, frame in ipairs(self:TabFrames()) do self:LayIn(frame) end
+    self:Grow()
+    local key = self.wanted or (ns.db and ns.db.finderShow == "enchant" and "enchant") or "upgrades"
+    self.wanted = nil
+    self:ShowTab(key)
+end
+
+--- The tabs go back: called by the one window (host.leave).
+function FinderUI:Leave()
+    if not self.oneArea then return end
+    self.leaving = true
+    for _, frame in ipairs(self:TabFrames()) do
+        if Shown(frame) then
+            local ok, err = pcall(frame.Hide, frame)
+            if not ok and ns.Debug then ns.Debug("one window leave:", tostring(err)) end
+        end
+    end
+    self.oneArea = nil
+    for _, frame in ipairs(self:TabFrames()) do self:LayOut(frame) end
+    self.leaving = false
+end
+
+--- What Equipment gives the one window when it joins.
+FinderUI.host = {
+    enter = function(area) FinderUI:Enter(area) end,
+    leave = function() FinderUI:Leave() end,
+}
+
+--- A tab is asked to open. With "One Window:" ticked and Equipment not in
+--- it yet, the one window opens on Equipment instead, on that tab; already
+--- in it, a window opened by itself goes through its tab. True when the
+--- caller should stop there.
+function FinderUI:Route(key)
+    if self.oneArea then
+        if self.inShowTab then return false end
+        self:ShowTab(key)
+        return true
+    end
+    local One = FinderUI.One()
+    if not (One and One.Hosts and One.Hosts("equipment")) then return false end
+    self.wanted = key
+    local ok, opened = pcall(One.Open, "equipment")
+    if ok and opened then return true end
+    self.wanted = nil
+    return false
+end
+
+--- A tab's window closed by itself (Escape, its close gem): inside the one
+--- window, the one window closes with it.
+function FinderUI:Closed()
+    if not self.oneArea or self.leaving or self.switching then return end
+    local One = FinderUI.One()
+    if One and One.Close then pcall(One.Close) end
 end
