@@ -254,7 +254,8 @@ function SettingsUI:Build()
     pages.Fit = function(page)
         fit(page)
         if ns.FinderUI then
-            ns.FinderUI:Need("settings", frame:GetWidth(), frame:GetHeight())
+            local need = page.need or { frame:GetWidth(), frame:GetHeight() }
+            ns.FinderUI:Need("settings", need[1], need[2])
             ns.FinderUI:FitTab(frame)
         end
     end
