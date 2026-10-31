@@ -1671,13 +1671,33 @@ end
 --- with a source the tick boxes, "Only what I can get now" and "This zone
 --- only" let through, best first. Every pick, not only the few best: the
 --- list for one slot runs as long as it needs.
-function FinderUI:Groups(found)
-    local groups = {}
+--- The window's filters as one test (the source boxes, "Only what I can
+--- get now" and "This zone only"): the function it gives takes a pick and
+--- answers the sources of it that pass, in order, a fresh list each time.
+--- The window's slot lists and the character sheet's tooltip both use it,
+--- so they always agree.
+function FinderUI:SourceFilter(found)
     local here = self:Here(found)
     local inZone = ns.UpgradeQuest and ns.UpgradeQuest.InZone
     local getNow = self:GetNowOnly()
     local on = {}
     for _, entry in ipairs(SOURCE_BOXES) do on[entry[1]] = self:SourceOn(entry[1]) end
+    return function(pick)
+        local sources = {}
+        for _, source in ipairs(pick.sources or {}) do
+            local kind = FinderUI.SourceKind(source)
+            if on[kind] ~= false and (not getNow or FinderUI.GetsNow(source, pick))
+                and (not here or not inZone or inZone(source, here)) then
+                sources[#sources + 1] = source
+            end
+        end
+        return sources
+    end
+end
+
+function FinderUI:Groups(found)
+    local groups = {}
+    local Passing = self:SourceFilter(found)
     local all = type(found.all) == "table" and found.all or found.slots or {}
     -- Better gear you own already: in your bags, your bank or on another
     -- of your characters (UI:ReadBags).
@@ -1696,14 +1716,7 @@ function FinderUI:Groups(found)
         if group[3] then table.sort(picks, Finder.Order) end
         local lines = {}
         for _, pick in ipairs(picks) do
-            local sources = {}
-            for _, source in ipairs(pick.sources or {}) do
-                local kind = FinderUI.SourceKind(source)
-                if on[kind] ~= false and (not getNow or FinderUI.GetsNow(source, pick))
-                    and (not here or not inZone or inZone(source, here)) then
-                    sources[#sources + 1] = source
-                end
-            end
+            local sources = Passing(pick)
             if #sources > 0 then lines[#lines + 1] = { pick = pick, sources = sources } end
         end
         local owned, links = {}, {}

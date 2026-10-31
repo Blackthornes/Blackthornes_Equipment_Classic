@@ -328,6 +328,25 @@ Finder:MarkStale()
 local picks = ns.SlotUpgrades:PicksFor(5)
 suite.check("the chest slot's picks, best first", #picks == 2 and picks[1].itemID == 1002, #picks)
 
+-- The tooltip follows the window's filters: an unticked kind of source
+-- leaves its gear off, and the tooltip says the filters hide it.
+do
+    local kept = ns.db.finderSourcesOff
+    ns.db.finderSourcesOff = { quest = true }
+    local shown, hidden = ns.SlotUpgrades:PicksFor(5)
+    suite.check("an unticked source leaves its gear off the tooltip",
+        #shown == 1 and shown[1].itemID == 1001 and hidden == 1, #shown .. "/" .. tostring(hidden))
+    ns.db.finderSourcesOff = { quest = true, vendor = true }
+    shown, hidden = ns.SlotUpgrades:PicksFor(5)
+    local tip = env.Stub({ _lines = {}, AddLine = function(self, t) self._lines[#self._lines + 1] = t end,
+        NumLines = function(self) return #self._lines end })
+    ns.SlotUpgrades:AddLines(tip, 5, shown, hidden)
+    suite.check("and the tooltip says the filters hide them", #shown == 0 and hidden == 2
+        and table.concat(tip._lines, "\n"):find("Your filters hide 2 more.", 1, true) ~= nil,
+        table.concat(tip._lines, " | "))
+    ns.db.finderSourcesOff = kept
+end
+
 local chest = env.Stub({ GetID = function() return 5 end })
 _G.CharacterChestSlot = chest
 ns.SlotUpgrades:OnEnable()
