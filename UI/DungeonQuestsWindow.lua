@@ -617,8 +617,9 @@ function DQUI:Show()
     if ns.FinderUI and ns.FinderUI.Route and ns.FinderUI:Route("dungeons") then return end
     self:Build()
     if not self.frame:IsShown() then
+        -- Inside the one window it fills the area: no spot of its own.
+        if not (ns.FinderUI and ns.FinderUI.oneArea) then self:RestorePosition() end
         if ns.FinderUI then ns.FinderUI:FitTab(self.frame) end
-        self:RestorePosition()
         self.frame:Show()
         if Motion and Motion.Open then Motion:Open(self.frame) end
         -- The rows' widths are known only once the window is laid out, so

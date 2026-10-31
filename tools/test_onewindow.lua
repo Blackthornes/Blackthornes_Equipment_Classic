@@ -48,9 +48,18 @@ local dq = ns.DungeonQuestsUI.frame
 suite.check("Dungeon Quests is in the same area", dq:GetParent() == area and dq:IsShown())
 suite.check("and the gear window stepped aside", not Finder.frame:IsShown())
 suite.check("the one window stays up", hub.frame:IsShown() and Finder:Hosted())
+SettingsUI:Build()
+local settings = SettingsUI.frame
+settings._point = false
+function settings:SetAlpha(value) self._alpha = value end
 SettingsUI:Show()
 suite.check("Settings opened by itself goes in as a tab", SettingsUI.frame:GetParent() == area
     and SettingsUI.frame:IsShown() and not dq:IsShown())
+-- A player saw it dimmed there (2026-10-31): its opening fade was left
+-- running with a spot of its own on the screen.
+suite.check("at full strength, its fade let go", settings._alpha == 1
+    and not ns.Motion:Running(settings, "open"))
+suite.check("and not placed at its own saved spot", not (rawget(settings, "_point") and settings._point[2] == UIParent))
 ns.DungeonLootUI:Show()
 suite.check("so does Dungeon Loot", ns.DungeonLootUI.frame:GetParent() == area
     and not SettingsUI.frame:IsShown())

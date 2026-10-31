@@ -246,8 +246,9 @@ function Motion:Open(frame, rise)
 
     self:Run(frame, "open", level == "full" and 0.2 or 0.12, function(p)
         frame:SetAlpha(p)
+        -- A point the client turns down never leaves the window half faded.
         if canMove then
-            frame:SetPoint(point, relativeTo, relativePoint, x, y - rise * (1 - p))
+            pcall(frame.SetPoint, frame, point, relativeTo, relativePoint, x, y - rise * (1 - p))
         end
     end)
 end
