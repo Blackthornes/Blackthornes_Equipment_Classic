@@ -123,6 +123,12 @@ Heading("gain"):GetScript("OnClick")(Heading("gain"))
 suite.check("and back to best first", Listed() == "1003,1002,1001,1004" and UI.sortKey == nil, Listed())
 suite.check("each row shows its level and where", UI.rows[1].level:GetText() == "20"
     and UI.rows[1].where:GetText():find("Molten Core", 1, true) ~= nil, UI.rows[1].level:GetText())
+suite.check("a raid drop's Where has the door mark", ns.Marks.KindOf(UI.rows[1].whereMark) == "dungeon",
+    tostring(ns.Marks.KindOf(UI.rows[1].whereMark)))
+suite.check("the marks follow where gear comes from", UI.MarkOf({ sources = { { kind = "vendor" } } }) == "vendor"
+    and UI.MarkOf({ sources = { { kind = "quest" } } }) == "quest"
+    and UI.MarkOf({ sources = { { kind = "craft" } } }) == "craft"
+    and UI.MarkOf({ sources = { { kind = "start" } } }) == nil and UI.MarkOf({}) == nil)
 Heading("item"):GetScript("OnEnter")(Heading("item"))
 suite.check("the heading's hover says how", table.concat(GameTooltip._lines or {}, "\n"):find("Click a heading to sort.", 1, true) ~= nil)
 Heading("item"):GetScript("OnLeave")(Heading("item"))

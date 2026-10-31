@@ -457,6 +457,14 @@ function FinderUI:BuildRow(index)
     where:SetWordWrap(true)
     row.where = where
 
+    -- The mark before where it comes from (UI/Marks.lua): a coin for a
+    -- vendor, a ! for a quest, a door for a dungeon or raid, an anvil for a
+    -- craft.
+    local whereMark = row:CreateTexture(nil, "ARTWORK")
+    if ns.Marks then ns.Marks.Attach(whereMark) else whereMark:Hide() end
+    whereMark:SetPoint("TOPLEFT", row, "TOPRIGHT", -(WHERE_RIGHT + WHERE_WIDTH), -LINE_TOP - 1)
+    row.whereMark = whereMark
+
     local source = Theme.CreateLabel(row, "tiny", "muted")
     source:SetPoint("TOPLEFT", item, "BOTTOMLEFT", 0, -3)
     source:SetWidth(ITEM_WIDTH)
@@ -1869,6 +1877,24 @@ function FinderUI.WhereOf(line)
     return names and names:Zone(source.zone) or source.zone
 end
 
+--- The mark for where a line's first source is: "vendor", "quest",
+--- "dungeon" (a raid too) or "craft"; nil for anything else.
+FinderUI.WHERE_MARKS = { vendor = "vendor", quest = "quest", dungeon = "dungeon", craft = "craft" }
+
+function FinderUI.MarkOf(line)
+    local source = line and line.sources and line.sources[1]
+    return source and FinderUI.WHERE_MARKS[source.kind] or nil
+end
+
+--- Shows a row's Where mark, or none, and leaves room for it in the column.
+function FinderUI.PlaceWhereMark(row, kind)
+    local mark = rawget(row, "whereMark")
+    if not mark then return end
+    if ns.Marks then ns.Marks.Set(mark, kind) else mark:Hide() end
+    local room = (kind and ns.Marks) and (ns.Marks.SIZE + 3) or 0
+    row.where:SetWidth(WHERE_WIDTH - room)
+end
+
 --- A pick's name, for sorting.
 function FinderUI.ItemName(pick)
     local name = type(pick.link) == "string" and pick.link:match("%[(.-)%]")
@@ -1976,6 +2002,7 @@ function FinderUI:FillRow(row, line)
     row.level:SetText(level and tostring(level) or "")
     row.level:Show()
     local where = FinderUI.WhereOf(line)
+    FinderUI.PlaceWhereMark(row, where and FinderUI.MarkOf(line) or nil)
     row.where:SetText(where and FinderUI.MarkZone(where, ns.UpgradeQuest and ns.UpgradeQuest.Zone()) or "")
     row.where:Show()
 
@@ -2023,6 +2050,7 @@ function FinderUI:FillHeadingRow(row, text)
     row.heading = true
     Theme.SetItemIcon(row.icon, nil)
     for _, label in ipairs({ row.item, row.gain, row.level, row.where, row.source }) do label:SetText("") end
+    FinderUI.PlaceWhereMark(row, nil)
     row.queueIt:Hide()
     row.headingLabel:SetText(text)
     row.headingLabel:Show()
@@ -2058,6 +2086,7 @@ function FinderUI:FillOwnedRow(row, owned)
     local level = FinderUI.LevelOf({ link = owned.link })
     row.level:SetText(level and tostring(level) or "")
     row.level:Show()
+    FinderUI.PlaceWhereMark(row, nil)
     row.where:SetText(FinderUI.OwnedWhere(owned.where))
     row.where:Show()
     row.queueIt:Hide()
@@ -2088,6 +2117,7 @@ function FinderUI:FillEnchantRow(row, line)
     row.enchant = line
     row.level:Hide()
     row.where:Hide()
+    FinderUI.PlaceWhereMark(row, nil)
     Theme.SetItemIcon(row.icon, line.plan.link)
     row.item:SetWidth(row.fullSourceWidth - GAIN_WIDTH - 8)
     row.item:SetText(Enchants:ShownName(pick.recipeID) or "")
