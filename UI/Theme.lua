@@ -514,9 +514,16 @@ function Theme.SetItemIcon(holder, item)
     end
 
     holder.icon:SetTexture(Theme.ItemIcon(item) or FALLBACK_ICON)
-    local r, g, b = Theme.QualityColor(item)
+    -- The thin frame takes the game's quality colour for every item, grey and
+    -- white softer (ns.ItemLook, the same file in all five addons).
+    local look = ns.ItemLook
+    local quality = look and look.QualityOf(ItemID(item) or item)
+    local r, g, b
+    if quality then r, g, b = look.Color(quality) end
+    if not r then r, g, b = Theme.QualityColor(item) end
     if r then
-        for _, edge in ipairs(holder.borderTextures or {}) do edge:SetColorTexture(r, g, b, 0.9) end
+        local alpha = (quality and quality <= 1) and look.PLAIN_ALPHA or 0.9
+        for _, edge in ipairs(holder.borderTextures or {}) do edge:SetColorTexture(r, g, b, alpha) end
     else
         Theme.SetBorderColor(holder, "border")
     end
