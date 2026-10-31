@@ -53,7 +53,7 @@ local function Stub(fields)
     end
 
     function frame:GetPoint()
-        local p = self._point
+        local p = rawget(self, "_point")
         if p and #p == 5 then return p[1], p[2], p[3], p[4], p[5] end
         return "CENTER", nil, "CENTER", 0, 40
     end

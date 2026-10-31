@@ -965,6 +965,15 @@ function FinderUI:ShownTabWindow()
     return nil
 end
 
+--- Inside the one window a tab shows at once, at full strength: its
+--- opening fade is let go, so it never stays faded or holds a spot of its
+--- own beside the area (a player saw Settings dimmed there, 2026-10-31).
+function FinderUI:Settle(frame)
+    if not (self.oneArea and frame) then return end
+    Motion:Stop(frame, "open")
+    pcall(frame.SetAlpha, frame, 1)
+end
+
 --- A tab clicked, or a stand-in window opened on its own: Upgrades and
 --- Enchants show this window, the others show their own window in its
 --- place, at the same spot, and every other window of the tabs goes.
@@ -993,6 +1002,7 @@ function FinderUI:ShowTabNow(key)
         self:Hide()
         standIn:Show()
         local frame = StandInFrame(STAND_INS[key])
+        self:Settle(frame)
         self:FitTab(frame)
         if current and not wasShown and frame and not self.oneArea then PlaceAt(frame, x, y) end
         standIn.asTab = true
@@ -1005,6 +1015,7 @@ function FinderUI:ShowTabNow(key)
     self.offset = 0
     local wasShown = Shown(self.frame)
     self:Show()
+    self:Settle(self.frame)
     self:FitTab(self.frame)
     if current and not wasShown and not self.oneArea then PlaceAt(self.frame, x, y) end
     if self.tabStrip then self.tabStrip:Select(key == "enchant" and "enchant" or "upgrades") end

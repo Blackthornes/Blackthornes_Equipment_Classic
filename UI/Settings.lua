@@ -1103,8 +1103,9 @@ function SettingsUI:Show()
     self.asTab = false
 
     if not self.frame:IsShown() then
+        -- Inside the one window it fills the area: no spot of its own.
+        if not (ns.FinderUI and ns.FinderUI.oneArea) then self:RestorePosition() end
         if ns.FinderUI then ns.FinderUI:FitTab(self.frame) end
-        self:RestorePosition()
         self.frame:Show()
         ns.Motion:Open(self.frame)
     end
