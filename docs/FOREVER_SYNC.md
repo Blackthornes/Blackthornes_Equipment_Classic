@@ -28,6 +28,11 @@ PR #244, 2026-10-23). This copy was made from it with its history on
   (Equipment Classic has none). Show on Map keeps Classic's own pin.
   `UI/Plaque.lua` keeps Classic's own copy with the new `Plaque.TextWidth`,
   the same in Farmer, Pets, Equipment and Tradeskills Classic.
+- `75bbd77` One Window steps aside for an open letter (2026-10-31): docked at
+  the mailbox it moves beside the letter and back, and tells side panels
+  when it docks, moves or undocks (`SharedWindow.Watch`, `DockedFrame`).
+  `UI/SharedWindow.lua` is FILE_VERSION 5, the same in all five Classic
+  repos.
 
 Every catch-up reads `docs/CLASSIC_DIFFERENCES.md` first, and the PR that
 brings Forever commits over updates the line above to the newest one it took.
