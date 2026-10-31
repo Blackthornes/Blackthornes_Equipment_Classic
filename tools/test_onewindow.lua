@@ -55,6 +55,27 @@ function settings:SetAlpha(value) self._alpha = value end
 SettingsUI:Show()
 suite.check("Settings opened by itself goes in as a tab", SettingsUI.frame:GetParent() == area
     and SettingsUI.frame:IsShown() and not dq:IsShown())
+
+-- Show Descriptions makes the pages taller: the one window grows to hold
+-- them. On the client Settings fills the area, so its own size only says
+-- how big the area is; the stand-in frame is made to answer the same way.
+do
+    local frame = SettingsUI.frame
+    local getW, getH = frame.GetWidth, frame.GetHeight
+    frame.GetWidth = function() return area:GetWidth() end
+    frame.GetHeight = function() return area:GetHeight() end
+    local before, oneBefore = area:GetHeight(), hub.frame:GetHeight()
+    SettingsUI.pages:ShowDescriptions(true)
+    local need = SettingsUI.pages.need
+    suite.check("descriptions on: the pages say how tall they are", type(need) == "table" and need[2] > before)
+    suite.check("Settings says what the pages need", Finder.needs and Finder.needs.settings and Finder.needs.settings[2] == need[2])
+    -- The test's frames don't follow their anchors, so the area keeps its
+    -- old height; the one window around it is what grows.
+    suite.check("and the one window grows to hold them",
+        hub.frame:GetHeight() - oneBefore >= need[2] - before)
+    SettingsUI.pages:ShowDescriptions(false)
+    frame.GetWidth, frame.GetHeight = getW, getH
+end
 -- A player saw it dimmed there (2026-10-31): its opening fade was left
 -- running with a spot of its own on the screen.
 suite.check("at full strength, its fade let go", settings._alpha == 1
