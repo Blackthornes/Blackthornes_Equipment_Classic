@@ -174,9 +174,10 @@ local before = SettingsUI.frame:GetHeight()
 pages.describe:GetScript("OnClick")(pages.describe)
 suite.check("Show descriptions is saved", ns.db.settingsDescriptions == true)
 suite.check("and puts the words under the rows", tooltipRow.hint:IsShown())
-suite.check("and the window grows to fit them", SettingsUI.frame:GetHeight() > before)
+suite.check("and the window keeps its size", SettingsUI.frame:GetHeight() == before)
+suite.check("the page scrolls instead", pages.body:GetHeight() > (pages.scroll:GetHeight() or 0))
 pages.describe:GetScript("OnClick")(pages.describe)
-suite.check("unticked, the window goes back", SettingsUI.frame:GetHeight() == before)
+suite.check("unticked, the window is the same", SettingsUI.frame:GetHeight() == before)
 
 -- The spec row's words change with the spec, in its tooltip too.
 controls.spec:SetValue(3)
