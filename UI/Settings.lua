@@ -151,8 +151,16 @@ function SettingsUI:ResetPositions()
     for _, keys in ipairs(POSITION_KEYS) do
         for _, key in ipairs(keys) do ns.db[key] = nil end
     end
+    -- A tab laid into the one window stays where it is: putting it back in
+    -- its own place would pull it out of the one window (a player's report,
+    -- 2026-10-31). Its saved place is still forgotten above.
+    local hosted = ns.FinderUI and ns.FinderUI.oneArea
+    local tabs = { [self] = true, [ns.UI or false] = true, [ns.FinderUI or false] = true,
+        [ns.DungeonQuestsUI or false] = true, [ns.DungeonLootUI or false] = true }
     for _, module in ipairs({ self, ns.UI, ns.WeightsUI, ns.FinderUI, ns.TrackerPanel, ns.QuestPanel, ns.QuestArrowUI, ns.IgnoredUI, ns.DungeonQuestsUI, ns.DungeonLootUI }) do
-        if module and module.frame and module.RestorePosition then module:RestorePosition() end
+        if module and module.frame and module.RestorePosition and not (hosted and tabs[module]) then
+            module:RestorePosition()
+        end
     end
 end
 --------------------------------------------------------------------------------

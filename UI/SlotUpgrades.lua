@@ -78,21 +78,35 @@ function SlotUpgrades.GainKey(pick)
     return (pick.needs or pick.remote) and "warn" or "good"
 end
 
---- The best picks for an inventory slot (both of a pair), best first.
+--- The best picks for an inventory slot (both of a pair), best first, as
+--- the Equipment window's filters leave them (FinderUI:SourceFilter): each
+--- pick shown is a copy carrying only the sources that pass. The second
+--- answer is how many upgrades the filters hide.
 function SlotUpgrades:PicksFor(slot)
     local found = ns.Finder and ns.Finder:Latest()
-    if not found then return {} end
-    local picks = {}
+    if not found then return {}, 0 end
+    local all = type(found.all) == "table" and found.all or found.slots or {}
+    local Passing = ns.FinderUI and ns.FinderUI.SourceFilter and ns.FinderUI:SourceFilter(found)
+    local picks, seen, hidden = {}, {}, 0
     for _, each in ipairs(PAIRS[slot] or { slot }) do
-        for _, pick in ipairs(found.slots[each] or {}) do picks[#picks + 1] = pick end
+        for _, pick in ipairs(all[each] or {}) do
+            if not seen[pick.itemID] then
+                seen[pick.itemID] = true
+                local sources = Passing and Passing(pick) or pick.sources
+                if sources and #sources > 0 then
+                    local copy = {}
+                    for key, value in pairs(pick) do copy[key] = value end
+                    copy.sources = sources
+                    picks[#picks + 1] = copy
+                else
+                    hidden = hidden + 1
+                end
+            end
+        end
     end
-    table.sort(picks, function(a, b)
-        if (a.needs == nil) ~= (b.needs == nil) then return a.needs == nil end
-        if a.remote ~= b.remote then return not a.remote end
-        return a.gain > b.gain
-    end)
+    table.sort(picks, ns.Finder.Order)
     for i = #picks, SHOWN + 1, -1 do picks[i] = nil end
-    return picks
+    return picks, hidden
 end
 
 --------------------------------------------------------------------------------
@@ -107,13 +121,14 @@ end
 --- Add the slot's upgrades to its tooltip. `picks` are the ones worked out
 --- when the slot was hovered; the game redraws a slot's tooltip several
 --- times a second, and the same lines go back on each time.
-function SlotUpgrades:AddLines(tooltip, slot, picks)
+function SlotUpgrades:AddLines(tooltip, slot, picks, hidden)
     if not self:IsEnabled() or not SLOT_NAMES[slot] then return end
     if not picks then
-        local ok, found = pcall(self.PicksFor, self, slot)
+        local ok, found, held = pcall(self.PicksFor, self, slot)
         if not ok then return end
-        picks = found
+        picks, hidden = found, held
     end
+    hidden = tonumber(hidden) or 0
 
     tooltip:AddLine(" ")
     if #picks == 0 then
@@ -125,6 +140,9 @@ function SlotUpgrades:AddLines(tooltip, slot, picks)
                 Theme.Unpack("muted"))
         else
             tooltip:AddLine(L["Nothing on offer beats this yet"], Theme.Unpack("muted"))
+            if hidden > 0 then
+                tooltip:AddLine(SlotUpgrades.HiddenText(hidden), Theme.Unpack("dim"))
+            end
         end
     else
         tooltip:AddLine(L["Upgrades on offer"], Theme.Unpack("accent"))
@@ -146,11 +164,18 @@ function SlotUpgrades:AddLines(tooltip, slot, picks)
     pcall(tooltip.Show, tooltip)
 end
 
+--- "Your filters hide 3 more.": the window's own words.
+function SlotUpgrades.HiddenText(hidden)
+    if hidden == 1 then return L["Your filters hide 1 more."] end
+    return L.Format("Your filters hide %d more.", hidden)
+end
+
 --- A slot was hovered: work out its upgrades once and put them on.
 function SlotUpgrades:OnSlotEnter(tooltip, button, slot)
-    local ok, picks = pcall(self.PicksFor, self, slot)
-    self.tip = { tooltip = tooltip, owner = button, slot = slot, picks = ok and picks or {} }
-    self:AddLines(tooltip, slot, self.tip.picks)
+    local ok, picks, hidden = pcall(self.PicksFor, self, slot)
+    self.tip = { tooltip = tooltip, owner = button, slot = slot,
+        picks = ok and picks or {}, hidden = ok and hidden or 0 }
+    self:AddLines(tooltip, slot, self.tip.picks, self.tip.hidden)
     self.tip.lines = LineCount(tooltip)
 end
 
@@ -167,7 +192,7 @@ function SlotUpgrades:Keep(tooltip)
     end
     if LineCount(tooltip) >= (tip.lines or 0) then return end
     self.keeping = true
-    pcall(self.AddLines, self, tooltip, tip.slot, tip.picks)
+    pcall(self.AddLines, self, tooltip, tip.slot, tip.picks, tip.hidden)
     self.keeping = false
     tip.lines = LineCount(tooltip)
 end

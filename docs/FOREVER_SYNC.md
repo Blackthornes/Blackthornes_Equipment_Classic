@@ -3,8 +3,9 @@
 Where this Classic Era copy stands against Forever Equipment
 (`Blackthornes/Blackthornes_Equipment`). Forever is only ever read from here.
 
-Last Forever commit copied over: `b871fde` (Forever main, the merge of its
-PR #244, 2026-10-23). This copy was made from it with its history on
+Last Forever commit copied over: `23f0435` (Forever main, 2026-11-02).
+The first copy was made from `b871fde` (Forever main, the merge of
+its PR #244, 2026-10-23). This copy was made from it with its history on
 2026-10-24.
 - `9ff6328` Shared minimap button shows the Blackthornes thorn B (2026-10-29,
   taken as it is: `UI/SharedMinimap.lua` at FILE_VERSION 2,
@@ -33,6 +34,10 @@ PR #244, 2026-10-23). This copy was made from it with its history on
   when it docks, moves or undocks (`SharedWindow.Watch`, `DockedFrame`).
   `UI/SharedWindow.lua` is FILE_VERSION 5, the same in all five Classic
   repos.
+- `35bf2b0` Set Default under Window Position keeps the one window's tab
+  in place (2026-11-02, as it is).
+- `23f0435` The gear slot tooltip and Alt-click list follow the upgrade
+  window's source filters (2026-11-02, as it is).
 
 Every catch-up reads `docs/CLASSIC_DIFFERENCES.md` first, and the PR that
 brings Forever commits over updates the line above to the newest one it took.
