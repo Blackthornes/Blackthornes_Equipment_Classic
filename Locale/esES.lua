@@ -332,6 +332,7 @@ L["No hunts finished yet."] = "Aún no has terminado ninguna cacería."
 -- UI/Toast
 L["Click to put it on"] = "Haz clic para ponértelo"
 L["Click to open Where to get upgrades"] = "Haz clic para abrir Dónde conseguir mejoras"
+L["Drag to move it. Right-click to put it back."] = "Arrástralo para moverlo. Clic derecho para devolverlo a su sitio."
 
 -- UI/UpgradeChat
 L["%s for %s"] = "%s para %s"
