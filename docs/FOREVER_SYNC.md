@@ -74,3 +74,6 @@ Brought over one at a time since:
   Forever's cat reweighting of Feral Combat is not taken, and Bear Form's
   weapon dps counts only as a tie-breaker on Era (see "Bear Tank weighs
   weapon damage lightly" in `docs/CLASSIC_DIFFERENCES.md`).
+- `db40457` The upgrade banner can be dragged and keeps its spot per
+  character, right-click puts it back (2026-11-07, the owner said yes; as it
+  is, with its six-language hover line).
