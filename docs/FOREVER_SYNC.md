@@ -69,3 +69,8 @@ Brought over one at a time since:
   to an alt (`Tooltip:BagSlot` also reads Era's bag buttons, whose bag is
   their frame's ID). `102d211` (white gear for casters) is not taken:
   Classic already weighs weapon damage and armor for casters (`f4a4f22`).
+- `0746854` Bear Tank for druids (2026-11-07, the owner said yes): the new
+  spec, its six-language name and `tank` meaning Bear Tank for a druid.
+  Forever's cat reweighting of Feral Combat is not taken, and Bear Form's
+  weapon dps counts only as a tie-breaker on Era (see "Bear Tank weighs
+  weapon damage lightly" in `docs/CLASSIC_DIFFERENCES.md`).

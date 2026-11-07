@@ -22,7 +22,8 @@ local used = {}
 for _, class in ipairs(CLASSES) do
     local specs = Weights.SPECS[class]
     suite.check(class .. " has specs", specs ~= nil)
-    suite.check(class .. " has three, in tree order", #specs.order == 3)
+    -- One a talent tree; druids add Bear Tank last, which talents never pick.
+    suite.check(class .. " has one a tree, in tree order", #specs.order == (class == "DRUID" and 4 or 3))
     suite.check(class .. "'s default is one of them", specs[specs.default] ~= nil, specs.default)
     suite.check(class .. " knows where its specs split", #specs.columns == 2)
     suite.check(class .. " has armour and weapon rules", specs.armor and specs.weapons)

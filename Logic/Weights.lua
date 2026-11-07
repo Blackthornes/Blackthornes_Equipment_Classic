@@ -364,7 +364,10 @@ local SPECS = {
     },
 
     DRUID = {
-        order = { "balance", "feral", "resto" },
+        -- "bear" comes last on purpose: the talents fill only the first
+        -- three places, one a tree, and can't tell cat from bear, so they
+        -- pick "feral" and a bear picks Bear Tank by hand.
+        order = { "balance", "feral", "resto", "bear" },
         default = "feral",
         columns = CLASSIC_COLUMNS,
         -- 8 is an idol.
@@ -391,6 +394,18 @@ local SPECS = {
                 agility = 1.0, strength = 1.0, stamina = 0.8, attackPower = 0.5,
                 crit = 14, hit = 12, armor = 0.05, dodge = 6, defense = 0.4,
                 meleeDps = 5,
+            },
+        },
+        bear = {
+            -- Bear Form tanking: armor and stamina first, then dodge and
+            -- defense, with some threat from strength, hit and crit. On Era
+            -- a weapon's damage does nothing in Bear Form, so its dps is only
+            -- a tie-breaker.
+            name = "Bear Tank",
+            weights = {
+                stamina = 1.0, armor = 0.12, agility = 0.8, defense = 1.0,
+                dodge = 12, strength = 0.5, hit = 8, crit = 4,
+                attackPower = 0.2, meleeDps = 0.3,
             },
         },
         resto = {
@@ -424,7 +439,8 @@ local ALIASES = {
     affliction = "affliction", affli = "affliction", aff = "affliction",
     demo = "demo", demonology = "demo", destro = "destro", destruction = "destro",
     balance = "balance", boomkin = "balance", moonkin = "balance",
-    feral = "feral", ["feral combat"] = "feral", cat = "feral", bear = "feral",
+    feral = "feral", ["feral combat"] = "feral", cat = "feral",
+    bear = "bear", ["bear tank"] = "bear", beartank = "bear",
 }
 
 -- What the client calls each stat, as returned by GetItemStats, mapped to the
@@ -579,7 +595,7 @@ local LABELS = {
     ["Enhancement"] = L["Enhancement"], ["Restoration"] = L["Restoration"], ["Arcane"] = L["Arcane"],
     ["Fire"] = L["Fire"], ["Frost"] = L["Frost"], ["Affliction"] = L["Affliction"],
     ["Demonology"] = L["Demonology"], ["Destruction"] = L["Destruction"], ["Balance"] = L["Balance"],
-    ["Feral Combat"] = L["Feral Combat"],
+    ["Feral Combat"] = L["Feral Combat"], ["Bear Tank"] = L["Bear Tank"],
     -- Stats
     ["Strength"] = L["Strength"], ["Agility"] = L["Agility"], ["Stamina"] = L["Stamina"],
     ["Intellect"] = L["Intellect"], ["Spirit"] = L["Spirit"], ["Armor"] = L["Armor"],
@@ -1321,9 +1337,17 @@ function Weights:DualWieldLevel(class)
 end
 
 --- Turn a spec a player typed into its key, or nil.
-function Weights:ResolveSpec(text)
+-- Words that mean a different spec for some classes: "tank" is Protection
+-- for a warrior or paladin and Bear Tank for a druid.
+local CLASS_ALIASES = {
+    DRUID = { tank = "bear" },
+}
+
+--- The spec key a typed name means, for `class` when given.
+function Weights:ResolveSpec(text, class)
     text = (text or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-    return ALIASES[text]
+    local own = class and CLASS_ALIASES[class]
+    return own and own[text] or ALIASES[text]
 end
 
 --------------------------------------------------------------------------------
@@ -1506,8 +1530,8 @@ ns.RegisterCommand("spec", L["show the spec gear is judged for, or pick one by n
             return
         end
 
-        local spec = Weights:ResolveSpec(rest)
         local class = Weights:PlayerClass()
+        local spec = Weights:ResolveSpec(rest, class)
         if not spec or not (class and SPECS[class] and SPECS[class][spec]) then
             local names = {}
             for _, key in ipairs(class and SPECS[class] and SPECS[class].order or {}) do

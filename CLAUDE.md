@@ -1168,6 +1168,19 @@ window and `customWeights` are untouched. Alts get neither. Since the patch
 no racial favours a weapon kind. Tested in `tools/test_ratingsandcap.lua`.
 A weekly patch check looks for racial, rating and cap changes.
 
+## Bear Tank for druids
+
+The owner said yes (2026-11-07, from Forever's `0746854`): druids get a
+fourth spec, `SPECS.DRUID.bear` ("Bear Tank"), last in `order`. Talents fill
+only the first three places and can't tell cat from bear, so they still
+pick feral, and a bear picks Bear Tank from "Judge Gear As:" or `/beq spec
+bear` (or `tank`, which stays Protection for warriors and paladins:
+`CLASS_ALIASES`, `Weights:ResolveSpec(text, class)`). Feral Combat's weights
+are unchanged on Era (Forever made feral a cat set; not taken). On Era a
+weapon's damage does nothing in Bear Form, so the bear set's `meleeDps` is a
+tie-breaker. No player's spec or weights move. Tested in
+`tools/test_bearweights.lua`.
+
 ## Players' own stat weights
 
 Kept in `BlackthornesEquipmentDB.customWeights[CLASS][spec][stat]`, account
