@@ -331,6 +331,7 @@ L["No hunts finished yet."] = "Законченных охот пока нет."
 -- UI/Toast
 L["Click to put it on"] = "Щёлкни, чтобы надеть"
 L["Click to open Where to get upgrades"] = "Щёлкни, чтобы открыть «Где взять улучшения»"
+L["Drag to move it. Right-click to put it back."] = "Перетащи, чтобы передвинуть. Правый клик вернёт на место."
 
 -- UI/UpgradeChat
 L["%s for %s"] = "%s для %s"

@@ -12,6 +12,10 @@
 -- Put it on sits in that row too, so the line above it keeps its width.
 -- Several at once wait their turn. Switched off with the "Upgrade banner"
 -- setting (`upgradeToast`); the chat line has its own switch.
+-- Drag moves it (a player asked, the owner said build it, 2026-11-05). It is
+-- no guarded button, so it moves in a fight too. Its top left is kept per
+-- character in `BlackthornesEquipmentCharDB.toastSpot` (`{ left, top }` on
+-- UIParent; never rename it); right-click puts it back at the top middle.
 
 local _, ns = ...
 local L = ns.L
@@ -43,9 +47,27 @@ function Toast:Build()
 
     local frame = CreateFrame("Button", "BlackthornesEquipmentToast", UIParent)
     frame:SetSize(WIDTH, HEIGHT)
-    frame:SetPoint("TOP", UIParent, "TOP", 0, -150)
     frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        -- Land the drop-in first, or its last step would pull it back.
+        Motion:Stop(self, "open", true)
+        self:StartMoving()
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        Toast.droppedAt = GetTime()
+        -- The game would keep the spot in its own layout file too; ours is
+        -- the only one kept.
+        local setUserPlaced = rawget(self, "SetUserPlaced") or self.SetUserPlaced
+        if type(setUserPlaced) == "function" then pcall(setUserPlaced, self, false) end
+        Toast:SaveSpot()
+    end)
+    frame:SetScript("OnMouseUp", function(_, mouse)
+        if mouse == "RightButton" then Toast:ResetSpot() end
+    end)
     Theme.Fill(frame, "window")
     -- The gold rim and the red close gem, as the house windows wear them;
     -- no plate or portrait, so it stays a banner.
@@ -105,6 +127,9 @@ function Toast:Build()
     end
 
     frame:SetScript("OnClick", function()
+        -- A drag ends with the mouse going up on it; that is no click.
+        local dropped = rawget(Toast, "droppedAt")
+        if type(dropped) == "number" and GetTime() - dropped < 0.3 then return end
         if ns.FinderUI then ns.FinderUI:Show() end
         Toast:Dismiss()
     end)
@@ -115,6 +140,7 @@ function Toast:Build()
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
             pcall(GameTooltip.SetHyperlink, GameTooltip, link)
             GameTooltip:AddLine(L["Click to open Where to get upgrades"], Theme.Unpack("muted"))
+            GameTooltip:AddLine(L["Drag to move it. Right-click to put it back."], Theme.Unpack("muted"))
             GameTooltip:Show()
         end
     end)
@@ -125,7 +151,52 @@ function Toast:Build()
 
     frame:Hide()
     self.frame = frame
+    self:Place()
     return frame
+end
+
+--- The spot the player dragged it to, or nil.
+function Toast:Spot()
+    local spot = ns.charDB and ns.charDB.toastSpot
+    if type(spot) == "table" and type(spot[1]) == "number" and type(spot[2]) == "number" then
+        return spot
+    end
+    return nil
+end
+
+--- Where the player left it, else near the top middle. Kept by its top left,
+--- so a taller banner (one with buttons) grows down from the same spot.
+function Toast:Place()
+    local frame = self.frame
+    if not frame then return end
+    frame:ClearAllPoints()
+    local spot = self:Spot()
+    if spot then
+        frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", spot[1], spot[2])
+    else
+        frame:SetPoint("TOP", UIParent, "TOP", 0, -150)
+    end
+end
+
+--- Keep where it was dropped, as its top left on UIParent.
+function Toast:SaveSpot()
+    local frame = self.frame
+    if not (frame and ns.charDB) then return end
+    local ok, left, top, scale = pcall(function()
+        return frame:GetLeft(), frame:GetTop(),
+            frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    end)
+    if not (ok and type(left) == "number" and type(top) == "number" and type(scale) == "number") then
+        return
+    end
+    ns.charDB.toastSpot = { left * scale, top * scale }
+    self:Place()
+end
+
+--- Back near the top middle.
+function Toast:ResetSpot()
+    if ns.charDB then ns.charDB.toastSpot = nil end
+    self:Place()
 end
 
 --- Show a banner: { title, link, text }. Waits behind one already showing.
@@ -143,6 +214,8 @@ end
 function Toast:Present(banner)
     self:Build()
     self.link = banner.link
+    -- Each character keeps its own spot.
+    self:Place()
     -- The mouse left with the last banner, even if the client said nothing.
     self.hovered = false
     self.title:SetText(banner.title or "")

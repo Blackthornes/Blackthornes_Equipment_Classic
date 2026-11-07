@@ -332,6 +332,7 @@ L["No hunts finished yet."] = "还没有完成的追踪。"
 -- UI/Toast
 L["Click to put it on"] = "点击穿上"
 L["Click to open Where to get upgrades"] = "点击打开“去哪里拿升级”"
+L["Drag to move it. Right-click to put it back."] = "拖动即可移动。右键点击放回原处。"
 
 -- UI/UpgradeChat
 L["%s for %s"] = "对%2$s来说%1$s"
