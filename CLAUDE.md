@@ -160,7 +160,11 @@ otherwise a table:
   Armor goes only to a character whose heaviest kind it is
   (`Weights:IsBestArmor`, the owner asked 2026-10-13: no cloth for a
   leather wearer); cloaks, rings, necks, trinkets and shields are not
-  asked.
+  asked. Soulbound gear is never offered to an alt (a player's report,
+  2026-11-07): gear that binds on pickup or is a quest item
+  (`Items:BindsOnPickup`), or a copy whose bag slot is soulbound
+  (`Alts:BestFor(link, bag, slot)`; the tooltip passes its slot,
+  `Tooltip:BagSlot`). Tested in `tools/test_alts.lua`.
 
 Each character keeps a note of itself when it plays (`Logic/Alts.lua`,
 account wide in `BlackthornesEquipmentDB.characterGear[guid]` = `{ class,
@@ -1245,6 +1249,12 @@ an addon closing it on leaving a place, `SharedWindow.Close(true)`, lets it
 go back to the addon open before (`hub.byItself`, read in OnHide). Butler
 passes it from `UI:LeftVendor` and `LeftPlace` (`ButlerTabs:Closed(frame,
 byItself)`). Tested in `tools/test_sharedwindow.lua`.
+
+Folded and docked (2026-11-07, FILE_VERSION 8, from Forever): docked or
+undocked while folded with the fold gem, the sizes are worked from the
+size it opens back up to (`SharedWindow.FullSize`, FoldWindow's
+`state.width`/`state.full`), never the folded strip's, so it never opens
+squashed.
 
 Equipment's tabs are in (2026-10-30, after Butler's and Pets'): "One
 Window:" sits on the General page (`SettingsUI:SetOneWindow`, writing
