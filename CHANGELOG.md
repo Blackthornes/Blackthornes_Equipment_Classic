@@ -4,6 +4,12 @@ Versions follow [semantic versioning](https://semver.org): the middle number
 moves for new behaviour, the last for fixes alone. The newest version goes at
 the top; a release is refused if its version has no section here.
 
+## 0.8.0
+
+- Druids can judge gear as a Bear Tank.
+- The upgrade banner can be dragged and remembers its place.
+- Various bug fixes.
+
 ## 0.7.6
 
 - Various bug fixes.
