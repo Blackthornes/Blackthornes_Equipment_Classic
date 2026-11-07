@@ -28,6 +28,10 @@ local ITEMS = {
     ["item:8"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = CLOTH, stats = Agi(30) },
     -- A cloak is cloth for everyone.
     ["item:9"] = { loc = "INVTYPE_CLOAK", class = ARMOR, subclass = CLOTH, stats = Agi(30) },
+    -- Item 4 again, but a quest reward that binds when picked up.
+    ["item:12"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = LEATHER, stats = Agi(4), bind = 1 },
+    -- Item 4 again, a quest item.
+    ["item:13"] = { loc = "INVTYPE_CHEST", class = ARMOR, subclass = LEATHER, stats = Agi(4), bind = 4 },
 }
 
 local ns = env.Load()
@@ -86,6 +90,19 @@ suite.check("but an upgrade for the rogue", advice.alt and advice.alt.key == "Pl
     advice.alt and advice.alt.key)
 suite.check("by 100 percent", advice.alt.gain == 100, advice.alt.gain)
 suite.check("to wear now", advice.alt.level == nil)
+
+-- Soulbound gear can't be traded, so it is never offered to an alt.
+suite.check("gear that binds on pickup helps no alt", Alts:BestFor("item:12") == nil)
+suite.check("nor a quest item", Alts:BestFor("item:13") == nil)
+local slotInfo = _G.C_Container.GetContainerItemInfo
+_G.C_Container.GetContainerItemInfo = function(bag, slot)
+    if bag == 0 and slot == 4 then return { quality = 1, isBound = true, stackCount = 1 } end
+    return slotInfo(bag, slot)
+end
+advice = Butler:Advise("item:4", 0, 4)
+suite.check("a soulbound copy in the bags is offered to nobody", advice and advice.alt == nil)
+suite.check("the same piece not in a bag slot still is", Alts:BestFor("item:4") ~= nil)
+_G.C_Container.GetContainerItemInfo = slotInfo
 
 advice = Butler:Advise("item:5", 0, 5)
 suite.check("mail is offered to nobody who cannot wear it", advice and advice.alt == nil)
@@ -244,6 +261,17 @@ suite.check("the tooltip names the alt it helps", Tooltip:AltLine("item:4", resu
 suite.check("an upgrade here says nothing about alts",
     Tooltip:AltLine("item:6", ns.Compare:JudgeCarried("item:6")) == nil)
 suite.check("a level wait is named", (Tooltip:AltLine("item:7", ns.Compare:JudgeCarried("item:7")) or ""):find("at level 30", 1, true))
+suite.check("no tooltip line for gear that binds on pickup",
+    Tooltip:AltLine("item:12", ns.Compare:JudgeCarried("item:12")) == nil)
+_G.C_Container.GetContainerItemInfo = function(bag, slot)
+    if bag == 0 and slot == 4 then return { quality = 1, isBound = true, stackCount = 1 } end
+    return slotInfo(bag, slot)
+end
+suite.check("no tooltip line for a soulbound copy in the bags", Tooltip:AltLine("item:4", result, 0, 4) == nil)
+local owner = { GetBagID = function() return 0 end, GetID = function() return 4 end }
+local bag, slot = Tooltip:BagSlot({ GetOwner = function() return owner end })
+suite.check("the tooltip reads its bag slot", bag == 0 and slot == 4)
+_G.C_Container.GetContainerItemInfo = slotInfo
 ns.db.altTooltipLine = false
 suite.check("the setting turns it off", Tooltip:AltLine("item:4", result) == nil)
 ns.db.altTooltipLine = nil

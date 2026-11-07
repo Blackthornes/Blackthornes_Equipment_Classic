@@ -63,6 +63,12 @@ Brought over one at a time since:
   in `docs/CLASSIC_DIFFERENCES.md`).
 - `dea75f5` (Butler's) the way there card's rows grow when a step wraps
   (2026-10-29, `UI/TravelCard.lua` only).
+- Picked fixes (2026-11-07, the owner said yes): the folded One Window
+  opens full after docking (`UI/SharedWindow.lua` FILE_VERSION 8, the same
+  in all five Classic repos) and `9d73ccf` soulbound gear is never offered
+  to an alt (`Tooltip:BagSlot` also reads Era's bag buttons, whose bag is
+  their frame's ID). `102d211` (white gear for casters) is not taken:
+  Classic already weighs weapon damage and armor for casters (`f4a4f22`).
 - `0746854` Bear Tank for druids (2026-11-07, the owner said yes): the new
   spec, its six-language name and `tank` meaning Bear Tank for a druid.
   Forever's cat reweighting of Feral Combat is not taken, and Bear Form's
