@@ -63,3 +63,8 @@ Brought over one at a time since:
   in `docs/CLASSIC_DIFFERENCES.md`).
 - `dea75f5` (Butler's) the way there card's rows grow when a step wraps
   (2026-10-29, `UI/TravelCard.lua` only).
+- `0746854` Bear Tank for druids (2026-11-07, the owner said yes): the new
+  spec, its six-language name and `tank` meaning Bear Tank for a druid.
+  Forever's cat reweighting of Feral Combat is not taken, and Bear Form's
+  weapon dps counts only as a tie-breaker on Era (see "Bear Tank weighs
+  weapon damage lightly" in `docs/CLASSIC_DIFFERENCES.md`).

@@ -182,3 +182,11 @@ next gear or level change. They hear Era's too now (`Finder:OnEnable`,
   Forever's FinderWindow has none of it.
 - Docking beside the auction house, mailbox, vendor and trainer (2026-10-30) is in the
   shared file, so Forever has none of it either.
+
+## Bear Tank weighs weapon damage lightly
+
+Forever's Bear Tank set (`0746854`) weighs weapon dps at 3, since Forever's
+forms scale with the weapon. On Era they don't, so Classic's set has
+`meleeDps = 0.3`, a tie-breaker. Forever also moved Feral Combat to a cat
+set (less stamina and armor, no dodge or defense); Classic keeps its Feral
+Combat weights as they were.
