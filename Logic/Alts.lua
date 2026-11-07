@@ -417,13 +417,18 @@ function Alts:Judge(note, link)
 end
 
 --- The other character this item helps most: { key (its GUID), gain,
---- level }, or nil. Only characters on the same realm and side as the one
---- playing, so it can be mailed; an empty slot beats any percent, and an
---- upgrade to wear now beats one that waits on a level. Armor of a kind
---- learned far ahead is left out (Weights:KindTooFar).
-function Alts:BestFor(link)
+--- level }, or nil. Never for gear that binds on pickup, or the copy in
+--- `bag`/`slot` when that copy is soulbound. Only characters on the same
+--- realm and side as the one playing, so it can be mailed; an empty slot
+--- beats any percent, and an upgrade to wear now beats one that waits on a
+--- level. Armor of a kind learned far ahead is left out (Weights:KindTooFar).
+function Alts:BestFor(link, bag, slot)
     link = Items.PlainLink(link)
     if not link then return nil end
+    -- A soulbound piece can't be traded or mailed, so it helps no one else
+    -- (a player saw a quest reward offered to an alt, 2026-11-07).
+    if Items:BindsOnPickup(link) then return nil end
+    if type(bag) == "number" and type(slot) == "number" and Items:SlotBound(bag, slot) then return nil end
     -- Without the character playing's GUID its own note can't be told from
     -- an alt's, and an upgrade "for an alt" could be mailed to itself
     -- (2026-10-11): no answer then. A character is its GUID, the one way

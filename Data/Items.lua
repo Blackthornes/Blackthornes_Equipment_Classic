@@ -574,6 +574,19 @@ function Items:SlotBound(bag, slot)
     return same and yes or false
 end
 
+--- Does the item bind when picked up (or as a quest item), so it can never
+--- be traded or mailed? False when the client cannot say.
+function Items:BindsOnPickup(link)
+    link = self.PlainLink(link)
+    if not link then return false end
+    local info = { Call(ITEM_INFO, link) }
+    local ok, yes = pcall(function()
+        local bindType = tonumber(info[14])
+        return bindType == 1 or bindType == 4
+    end)
+    return ok and yes or false
+end
+
 --- How many slots a bag has (0 when there is no bag there).
 function Items:BagSize(bag)
     local size = Call(BAG_SLOTS, bag)

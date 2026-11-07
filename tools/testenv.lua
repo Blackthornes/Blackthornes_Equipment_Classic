@@ -228,7 +228,7 @@ end
 --- A pretend item cache, worn gear and bags, answered through the C_Item and
 --- C_Container calls Forever has.
 --
---   items    [link] = { loc, class, subclass, minLevel, stats }
+--   items    [link] = { loc, class, subclass, minLevel, stats, bind (bind type) }
 --   worn     [inventory slot] = link
 --   bags     [bag] = { [slot] = link }
 --   level    the player's level
@@ -252,7 +252,7 @@ function env.InstallItems(items, worn, bags, level)
             local item = Known(link)
             if not item then return nil end
             return "Item", link, 2, 10, item.minLevel or 1, "Armor", "Leather", 1,
-                item.loc, "icon", 100, item.class, item.subclass
+                item.loc, "icon", 100, item.class, item.subclass, item.bind
         end,
         GetItemStats = function(link)
             local item = Known(link)
