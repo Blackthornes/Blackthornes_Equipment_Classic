@@ -1,6 +1,12 @@
 ## Interface: 11509
 ## Title: Blackthornes Equipment
 ## Notes: Looks at the gear in your bags and the quest rewards on offer, and says which is best for your class and spec.
+## Notes-deDE: Prüft die Ausrüstung in deinen Taschen und die angebotenen Questbelohnungen und sagt dir, was für deine Klasse und Spezialisierung am besten ist.
+## Notes-frFR: Regarde l'équipement de tes sacs et les récompenses de quête proposées, et te dit lequel est le meilleur pour ta classe et ta spécialisation.
+## Notes-esES: Revisa el equipo de tus bolsas y las recompensas de misión que te ofrecen, y te dice cuál es mejor para tu clase y especialización.
+## Notes-esMX: Revisa el equipo de tus bolsas y las recompensas de misión que te ofrecen, y te dice cuál es mejor para tu clase y especialización.
+## Notes-ruRU: Смотрит на снаряжение в сумках и награды за задания и говорит, что лучше всего для твоего класса и специализации.
+## Notes-zhCN: 查看你背包里的装备和可选的任务奖励，告诉你哪件最适合你的职业和专精。
 ## Author: Blackthornes
 ## Version: @project-version@
 ## X-License: All Rights Reserved
