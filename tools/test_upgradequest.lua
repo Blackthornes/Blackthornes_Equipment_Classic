@@ -633,14 +633,18 @@ ns.Finder.Build = function(...) scans = scans + 1 return realBuild(...) end
 for _ = 1, 20 do
     Event("BAG_UPDATE_DELAYED")
     Event("QUEST_LOG_UPDATE")
-    Event("ZONE_CHANGED_NEW_AREA")
 end
 suite.check("twenty loots and quest log ticks scan nothing", scans == 0, scans)
 clock = clock + 61
 Event("BAG_UPDATE_DELAYED")
 suite.check("a bag change with no new gear looks at nothing, even a minute later", scans == 0, scans)
+clock = clock + 600
+Event("BAG_UPDATE_DELAYED")
+suite.check("nor ten minutes later", scans == 0, scans)
+Event("ZONE_CHANGED_NEW_AREA")
+suite.check("a new zone looks again", scans == 1, scans)
 Event("PLAYER_EQUIPMENT_CHANGED")
-suite.check("new gear worn looks again", scans == 1, scans)
+suite.check("new gear worn looks again", scans == 2, scans)
 ns.Finder.Build = realBuild
 _G.time = realTime
 

@@ -711,7 +711,7 @@ end
 --- Forget the kept verdicts (talents or weapon skills changed).
 function Finder:ForgetVerdicts()
     self.judgeGeneration = (self.judgeGeneration or 0) + 1
-    self.stale = true
+    self:MarkStale()
 end
 
 --- One item's verdict, judged once per Judged() set. Gear with random rolls
@@ -914,18 +914,14 @@ function Finder.Now()
 end
 
 --- The latest scan of everything for now, made again (in the background,
---- once there is one) when the gear, the level or the bags changed since, at
---- most every few seconds. For the character sheet's slots, which ask on
---- every hover.
-local KEEP_LATEST = 300
-
+--- once there is one) only when something it reads changed since: the gear
+--- worn, the level, a setting. For the character sheet's slots, which ask
+--- on every hover. No clock makes it old.
 function Finder:Latest()
     if self.background then return self.latest end
     -- Kept until something it reads changes (an event marks it stale, the
-    -- key catches one whose event was missed), else for KEEP_LATEST seconds
-    -- for what no event tells (a reputation standing).
+    -- key catches one whose event was missed).
     local fresh = self.latest and not self.stale and self.latestKey == self:JudgeKey()
-        and (self.Now() - (self.latestAt or 0)) < KEEP_LATEST
     if not fresh and (not self.latest or (self.Now() - (self.latestAt or 0)) >= 2) then
         -- Made a slice per frame, the last one kept on show meanwhile. The
         -- very first is too: done in one go, a hover froze the game.
@@ -940,32 +936,40 @@ function Finder:Asked(itemID)
     return ok and id ~= nil and self.asked ~= nil and self.asked[id] == true
 end
 
+--- Something the scan reads changed (gear worn, level, a setting). The
+--- next scan may look once more when the items it asked about come in.
 function Finder:MarkStale()
     self.stale = true
+    self.followUp = true
 end
 
 -- How long after the last answer the server sent about items a scan asked
--- for before the scan is made again. The answers come in bursts of dozens;
--- each one used to set off a full scan of every item.
+-- for before it counts as settled. The answers come in bursts of dozens.
 local ANSWER_SETTLE = 2
 Finder.ANSWER_SETTLE = ANSWER_SETTLE
 
 --- What wants to hear once a burst of item answers has settled, each
---- called with no arguments (the upgrade quest, the finder window).
+--- called with one argument: true when the scan may be made again (the
+--- upgrade quest looks only then; the open finder window always redraws).
 Finder.answerWatchers = Finder.answerWatchers or {}
 
 function Finder:WatchAnswers(fn)
     if type(fn) == "function" then self.answerWatchers[#self.answerWatchers + 1] = fn end
 end
 
---- The burst of answers is over: the scan is out of date, and whatever
---- watches looks again, once.
+--- The burst of answers is over. Only the first burst after a real change
+--- makes the scan out of date; the scan after that asks about more items,
+--- and their answers must not start another, or it never stops (a full
+--- scan every few seconds until every item in the data has loaded).
 function Finder:AnswersSettled()
-    self:MarkStale()
+    local again = self.followUp == true
+    self.followUp = false
+    if again then self.stale = true end
     for _, fn in ipairs(self.answerWatchers) do
-        local ok, err = pcall(fn)
+        local ok, err = pcall(fn, again)
         if not ok then ns.Debug("finder:", tostring(err)) end
     end
+    return again
 end
 
 --- GET_ITEM_INFO_RECEIVED: an answer about an item a scan asked for waits
@@ -1149,6 +1153,8 @@ function Finder:OnEnable()
     for _, event in ipairs({ "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, self.ForgetVerdicts)
     end
+    -- Passed on only when a skill is learned or dropped (ns.NothingChanged),
+    -- never for a skill point.
     ns.RegisterEvent(self, "SKILL_LINES_CHANGED", self.ForgetVerdicts)
 end
 

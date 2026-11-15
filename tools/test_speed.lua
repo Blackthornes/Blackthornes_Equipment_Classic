@@ -227,8 +227,29 @@ do
     Finder:OnItemAnswer(1002)
     Finder:OnItemAnswer(1003)
     suite.check("a burst of answers marks nothing while it comes", stales == 0, stales)
+    local settled, realSettled = {}, Finder.AnswersSettled
+    Finder.AnswersSettled = function(self, ...)
+        local again = realSettled(self, ...)
+        settled[#settled + 1] = again
+        return again
+    end
+    Finder.followUp = true   -- as after a real change (gear worn, a setting)
     for _, fn in ipairs(held) do fn() end
-    suite.check("and marks the scan out of date once when it settles", stales == 1, stales)
+    suite.check("and marks the scan out of date once when it settles", settled[1] == true, tostring(settled[1]))
+    -- The scan that follows asks about more items. Their answers must not
+    -- start yet another scan, or it never stops.
+    held = {}
+    Finder.asked[1004] = true
+    Finder:OnItemAnswer(1004)
+    for _, fn in ipairs(held) do fn() end
+    suite.check("the answers after that follow-up start no more scans", settled[2] == false, tostring(settled[2]))
+    Finder.AnswersSettled = realSettled
+    local heard
+    Finder:WatchAnswers(function(again) heard = again end)
+    suite.check("and the watchers hear not to look again", Finder:AnswersSettled() == false and heard == false)
+    Finder:MarkStale()
+    suite.check("a real change lets one more follow", Finder:AnswersSettled() == true and heard == true)
+    Finder.answerWatchers[#Finder.answerWatchers] = nil
     suite.check("an answer nobody asked for is left alone", Finder:OnItemAnswer(4242) == false)
     _G.C_Timer.After = realAfter
 
@@ -250,7 +271,7 @@ do
     Finder:OnBags()
     Finder.MarkStale = realMark
 
-    -- A scan kept for a while is not looked at again every minute.
+    -- A scan is kept until something it reads changes; no clock makes it old.
     local clock = 5000
     local realNow = Finder.Now
     Finder.Now = function() return clock end
@@ -262,7 +283,13 @@ do
     suite.check("a scan two minutes old is still used", again == 0, again)
     clock = clock + 300
     Finder:Latest()
-    suite.check("one seven minutes old is looked at again", again == 1, again)
+    suite.check("one seven minutes old is still used", again == 0, again)
+    clock = clock + 3600
+    Finder:Latest()
+    suite.check("even an hour later", again == 0, again)
+    Finder:MarkStale()
+    Finder:Latest()
+    suite.check("a real change looks again", again == 1, again)
     Finder.ScanInBackground = realBackground
     Finder.Now = realNow
 end
@@ -290,4 +317,30 @@ do
 end
 
 Compare.Judge = realJudge
+--------------------------------------------------------------------------------
+-- Spell and skill events judge again only when a weapon skill really changed
+--------------------------------------------------------------------------------
+
+do
+    local Skills = ns.WeaponSkills
+    local known = {}
+    local realSpell = rawget(_G, "IsPlayerSpell")
+    _G.IsPlayerSpell = function(id) return known[id] == true end
+    Skills.kept = nil
+    Skills.signature = Skills.Signature(Skills:ReadKnown())
+    local generation = Finder.judgeGeneration or 0
+    for _ = 1, 10 do Skills:Learned() end
+    suite.check("ten skill events with nothing learned judge nothing again",
+        (Finder.judgeGeneration or 0) == generation, Finder.judgeGeneration)
+    known[227] = true   -- Staves
+    Skills:Learned()
+    suite.check("a weapon skill learned judges again once",
+        (Finder.judgeGeneration or 0) == generation + 1, Finder.judgeGeneration)
+    Skills:Learned()
+    suite.check("and the next event changes nothing",
+        (Finder.judgeGeneration or 0) == generation + 1, Finder.judgeGeneration)
+    _G.IsPlayerSpell = realSpell
+    Skills.kept = nil
+end
+
 suite.done()

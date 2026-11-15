@@ -74,16 +74,15 @@ UpgradeQuest.NONE = NONE
 UpgradeQuest.states = {}
 
 -- A tab with nothing to pick is only looked at again when something that can
--- open new gear happens (gear, level, talents, recipes, quests handed in, item
--- answers) or the player asks, so looting and quest log ticks stay cheap.
--- A bag change looks again at most once a minute (gear sold or thrown away
--- can be picked again). Not saved.
+-- open new gear happens: a new zone, the gear worn, the level, talents, a
+-- recipe or skill learned (the client passes SKILL_LINES_CHANGED on only then),
+-- a setting, or the player asks. Looting, the bags, the quest log, skill
+-- points and item answers never start a search by themselves. Not saved.
 UpgradeQuest.rescan = true
-local BAG_RESCAN = 60
 local RESCAN_ON = {
-    PLAYER_EQUIPMENT_CHANGED = true, PLAYER_LEVEL_UP = true, QUEST_TURNED_IN = true,
-    GET_ITEM_INFO_RECEIVED = true, SKILL_LINES_CHANGED = true, NEW_RECIPE_LEARNED = true,
-    TRAIT_CONFIG_UPDATED = true, CHARACTER_POINTS_CHANGED = true, PLAYER_TALENT_UPDATE = true,
+    PLAYER_EQUIPMENT_CHANGED = true, PLAYER_LEVEL_UP = true, NEW_RECIPE_LEARNED = true,
+    TRAIT_CONFIG_UPDATED = true, SKILL_LINES_CHANGED = true,
+    CHARACTER_POINTS_CHANGED = true, PLAYER_TALENT_UPDATE = true,
 }
 
 local Items = ns.Items
@@ -610,7 +609,7 @@ function UpgradeQuest:WorthLooking(empty)
     for _, tab in ipairs(empty) do
         if self.states[tab] ~= "none" then return true end
     end
-    return self.bagsChanged and Now() - (self.lookedAt or 0) >= BAG_RESCAN or false
+    return false
 end
 
 --- Give every tab without a quest its best upgrade, and pick the tab the
@@ -633,8 +632,6 @@ function UpgradeQuest:PickEmpty()
         return
     end
     self.rescan = false
-    self.bagsChanged = false
-    self.lookedAt = Now()
     for _, tab in ipairs(empty) do
         local best = self:Choose(found, nil, tab)
         if best then self:Start(best.pick, best.source) end
@@ -1841,16 +1838,19 @@ function UpgradeQuest:OnEvent(event, level)
             self:Mirror()
         end
         self.rescan = true
-    end
-    -- A stack growing or shrinking changes no upgrade; only gear coming or
-    -- going does. The steps still read the bags again below.
-    if event == "BAG_UPDATE_DELAYED" then
-        local finder = ns.Finder
-        if not (finder and type(finder.CarriedMoved) == "function")
-            or finder:CarriedMoved("upgradeQuest") then
-            self.bagsChanged = true
+    elseif newZone then
+        -- Any new zone may have upgrades a tab that found nothing can use.
+        -- On a flight, every zone flown over would start a search, so that
+        -- waits for the landing.
+        if self.OnTaxi() then
+            self.landing = true
+            self:WatchLanding()
+            return
         end
+        self.rescan = true
     end
+    -- The bags only change the steps (read again below), never start a
+    -- search: an upgrade new in the bags is told by UI/UpgradeChat.lua.
     self:UpdateSoon()
 end
 
@@ -1885,11 +1885,20 @@ function UpgradeQuest:OnEnable()
     if self:IsEnabled() then self:UpdateSoon(3) end
 end
 
+--- A weapon skill was really learned (WeaponSkills compares the known
+--- skills): a weapon that waited on it may be the next upgrade.
+function UpgradeQuest:SkillLearned()
+    if not self:IsEnabled() then return end
+    self.rescan = true
+    self:UpdateSoon()
+end
+
 -- Answers to what a finder scan asked for come in bursts; the finder says
--- once a burst settles, and the quest looks again then, once.
+-- once a burst settles. Only the first burst after a real change looks
+-- again (`again`); the answers that look asks for start nothing more.
 if ns.Finder and type(ns.Finder.WatchAnswers) == "function" then
-    ns.Finder:WatchAnswers(function()
-        if UpgradeQuest:IsEnabled() then
+    ns.Finder:WatchAnswers(function(again)
+        if again and UpgradeQuest:IsEnabled() then
             UpgradeQuest.rescan = true
             UpgradeQuest:UpdateSoon()
         end
