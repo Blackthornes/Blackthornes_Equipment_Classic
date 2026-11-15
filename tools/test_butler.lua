@@ -120,6 +120,21 @@ suite.check("nor anything that is not a link", Butler:Advise({}) == nil and Butl
 suite.check("without judging the gear", judged == 0, judged)
 ns.Compare.JudgeCarried = judge
 
+-- Never: only gear this class can never wear.
+local function AdviseAs(result)
+    ns.Compare.JudgeCarried = function() return result end
+    local a = Butler:Advise("item:2", 0, 2)
+    ns.Compare.JudgeCarried = judge
+    return a
+end
+advice = AdviseAs({ verdict = "cantuse" })
+suite.check("gear the class can never wear says never", advice and advice.never == true)
+suite.check("mail learned later is not never", AdviseAs({ verdict = "cantuse", laterArmor = 40 }).never == nil)
+suite.check("Best Armor Only is not never", AdviseAs({ verdict = "cantuse", lighterArmor = true }).never == nil)
+suite.check("a hidden untrained weapon is not never",
+    AdviseAs({ verdict = "cantuse", ignoredSkill = "Staves" }).never == nil)
+suite.check("a downgrade is not never", AdviseAs({ verdict = "downgrade", percent = -5 }).never == nil)
+
 -- Never raises.
 ns.Compare.JudgeCarried = function() error("boom") end
 local ok, answer = pcall(Butler.Advise, Butler, "item:2", 0, 2)
