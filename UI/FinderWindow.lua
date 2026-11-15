@@ -2599,9 +2599,16 @@ function FinderUI:OnEnable()
     end
     -- Only answers the finder asked for: the client loads items for chat
     -- links, the auction house and other addons all the time.
-    -- They come in bursts, so the window looks again once they settle.
+    -- They come in bursts. While the window is up the finder keeps asking
+    -- for the rest a batch at a time, and the window scans again only once
+    -- they are all in (or a real change let one more scan follow).
     if type(Finder.WatchAnswers) == "function" then
-        Finder:WatchAnswers(function() FinderUI:RefreshSoon() end)
+        Finder.keepAsking = function()
+            return FinderUI.frame ~= nil and FinderUI.frame:IsShown() and true or false
+        end
+        Finder:WatchAnswers(function(again, done)
+            if again or done then FinderUI:RefreshSoon() end
+        end)
     else
         ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
             if Finder:Asked(itemID) then FinderUI:RefreshSoon() end
