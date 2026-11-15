@@ -285,7 +285,7 @@ function QuestPanel:BuildStep(index)
     row:SetScript("OnMouseUp", function(self, button)
         if button ~= "LeftButton" or not self.place then return end
         if ns.QuestArrow and ns.QuestArrow:Aim(self.index) then
-            if type(_G.PlaySound) == "function" then
+            if type(_G.PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
                 pcall(_G.PlaySound, _G.SOUNDKIT and _G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
             end
         end
@@ -1197,7 +1197,7 @@ function QuestPanel:Cheer()
     Motion:Run(self.frame, "cheer", 0.9, function(p)
         Theme.SetHalo(self.frame, 0.6 + (rest - 0.6) * p, p < 1 and "good" or "accent")
     end)
-    if type(_G.PlaySound) == "function" then
+    if type(_G.PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
         local kit = _G.SOUNDKIT and _G.SOUNDKIT.UI_QUEST_OBJECTIVE_COMPLETE
         pcall(_G.PlaySound, kit or 6197, "Master")
     end

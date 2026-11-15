@@ -163,6 +163,23 @@ function SettingsUI:ResetPositions()
         end
     end
 end
+
+--- Every Blackthornes window back where it started, in every addon loaded
+--- (the owner, 2026-11-12): the one window, its docked spots, the small
+--- windows and each addon's own. Settings and data stay the same.
+function SettingsUI:ResetAllWindows()
+    local shared = ns.SharedWindow
+    if shared and shared.ResetAllSpots then
+        shared.ResetAllSpots()
+    else
+        SettingsUI:ResetPositions()
+    end
+    ns.Print(L["Every window is back in its first spot."])
+end
+
+if ns.SharedWindow and ns.SharedWindow.AddSpotReset then
+    ns.SharedWindow.AddSpotReset("Equipment", function() SettingsUI:ResetPositions() end)
+end
 --------------------------------------------------------------------------------
 -- Construction
 --------------------------------------------------------------------------------
@@ -846,6 +863,14 @@ function SettingsUI:BuildGeneral()
     controls.effects:SetPoint("TOPLEFT", CONTROL_X, 0)
     controls.effectsIndex = EffectIndex
 
+    -- Quiets every sound every Blackthornes addon plays (UI/SharedChoices.lua,
+    -- a player asked, 2026-11-12). Off unless ticked; ticked in one is ticked in all.
+    local muteRow = pages:Row("general", 1, L["Mute All Sounds:"], nil)
+    controls.muteSounds = Widgets.CreateCheckbox(muteRow, L["On"], function(checked)
+        SettingsUI:SetMuteSounds(checked)
+    end, false)
+    controls.muteSounds:SetPoint("TOPLEFT", CONTROL_X, -2)
+
     -- One minimap button for every Blackthornes addon (UI/SharedMinimap.lua,
     -- the owner, 2026-10-28): ticked unless unticked, the same in all five.
     local combineRow = pages:Row("general", 1, L["Combine Addon Buttons:"], nil)
@@ -865,11 +890,10 @@ function SettingsUI:BuildGeneral()
 
     -- The minimap button always shows (the owner, 2026-10-15); a saved
     -- minimapHidden is kept but no longer read.
-    local positionRow = pages:Row("general", 1, L["Window Positions:"],
-        L["Reset the UI windows to their defaults."])
+    local positionRow = pages:Row("general", 1, L["Window Spots:"],
+        L["Puts every Blackthornes window back where it started. Your settings and data stay the same."])
     local reset = Widgets.CreateButton(positionRow, L["Set Default"], function()
-        SettingsUI:ResetPositions()
-        ns.Print(L["UI windows set to defaults."])
+        SettingsUI:ResetAllWindows()
     end, { width = 100, height = 20 })
     reset:SetPoint("TOPLEFT", CONTROL_X, 0)
     controls.resetPositions = reset
@@ -1042,6 +1066,7 @@ function SettingsUI:Refresh()
     local One = ns.FinderUI and ns.FinderUI.One()
     controls.oneWindow:SetChecked(One ~= nil and One.On() == true)
     controls.effects:SetValue(controls.effectsIndex(), true)
+    controls.muteSounds:SetChecked(ns.Muted ~= nil and ns.Muted() == true)
     if ns.SeeThrough then
         for id, choice in pairs(controls.seeThrough or {}) do choice:SetValue(ns.SeeThrough:Level(id), true) end
     end
@@ -1223,6 +1248,29 @@ end)
 
 -- Common names for the same thing, so a guess works. Kept out of the help
 -- list, which would otherwise print the same line three times.
+-- Mute All Sounds: kept in this addon's own save as muteSounds and
+-- muteSoundsAt (never rename them) and told to every sister.
+function SettingsUI:SetMuteSounds(on)
+    on = on and true or false
+    local at = ns.SharedChoices and ns.SharedChoices:SetMute(on) or nil
+    if ns.db then
+        ns.db.muteSounds = on
+        ns.db.muteSoundsAt = at
+    end
+    if self.Refresh and self.frame and self.frame:IsShown() then pcall(self.Refresh, self) end
+end
+
+ns.RegisterCommand("mute", L["turn every Blackthornes sound off or back on (on/off)"], function(arg)
+    arg = ((arg or ""):match("^%s*(.-)%s*$") or ""):lower()
+    local on
+    if arg == "on" then on = true
+    elseif arg == "off" then on = false
+    else on = not (ns.Muted and ns.Muted()) end
+    SettingsUI:SetMuteSounds(on)
+    ns.Print(on and L["All Blackthornes sounds are off. /beq mute off turns them back on."]
+        or L["Blackthornes sounds are back on."])
+end)
+
 ns.commands.options = ns.commands.settings
 ns.commands.config = ns.commands.settings
 
@@ -1244,8 +1292,23 @@ if ns.SharedChoices then
             if ns.TomTom then ns.TomTom:SetOn(value and true or false) end
         elseif choice == "arrowRoute" then
             if ns.Travel then ns.Travel:SetOn(value and true or false) end
+        elseif choice == "muteSounds" then
+            ns.db.muteSounds = value and true or false
+            ns.db.muteSoundsAt = ns.SharedChoices.board.mute.at
         end
         -- Era's Equipment has no Arrow Size: an arrowSize from a sister is left alone.
         if ns.SettingsUI and ns.SettingsUI.Refresh and ns.SettingsUI.frame and ns.SettingsUI.frame:IsShown() then pcall(ns.SettingsUI.Refresh, ns.SettingsUI) end
+    end, function()
+        if not ns.db then return nil end
+        return ns.db.muteSounds == true, ns.db.muteSoundsAt
     end)
 end
+
+ns.RegisterCommand("windows", L["put every Blackthornes window back where it started (reset)"], function(arg)
+    arg = ((arg or ""):match("^%s*(.-)%s*$") or ""):lower()
+    if arg == "reset" then
+        SettingsUI:ResetAllWindows()
+    else
+        ns.Print(L["Type /beq windows reset to put every window back in its first spot."])
+    end
+end)
