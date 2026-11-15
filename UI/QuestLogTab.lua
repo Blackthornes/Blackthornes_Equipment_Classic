@@ -353,7 +353,7 @@ function QuestLogUI:BuildRow(index)
     row.note:Hide()
 
     -- Card J: a green mark when the quest's reward beats what you wear.
-    row.mark = Theme.CreateLabel(row, "small", "upgrade", "RIGHT")
+    row.mark = Theme.CreateLabel(row, "small", "good", "RIGHT")
     row.mark:Hide()
 
     -- Where the quest's item button goes (it is not a child of the panel).
