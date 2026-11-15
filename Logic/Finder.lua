@@ -38,6 +38,13 @@ local ASK_PER_SCAN = 40
 -- windows (the quest reward choices) waited behind it.
 local ASK_TRIES = 3
 
+-- How long a batch asked for may go without a single answer before the
+-- next step is taken anyway (the server drops some of what it is asked).
+-- An item is not asked about again sooner than this, so several scans in
+-- a row (a tick box, a filter) spend one try on it between them, not one
+-- each.
+local ANSWER_WAIT = 5
+
 -- How many upgrades to keep per slot.
 local PER_SLOT = 3
 Finder.PER_SLOT = PER_SLOT
@@ -584,14 +591,22 @@ end
 --- link, another addon's window) does not set off a scan.
 --- Nothing is asked while a quest giver's window is open: the reward
 --- choices there wait on the same queue, and the scan can ask again once it
---- closes. An item asked ASK_TRIES times without arriving is not asked again.
+--- closes. An item asked ASK_TRIES times without arriving is not asked again,
+--- and one asked a moment ago is not asked twice while its answer is due.
 --- @return true when the server was asked
 function Finder:Request(itemID)
     self.asked = self.asked or {}
     self.tries = self.tries or {}
     if (self.tries[itemID] or 0) >= ASK_TRIES then return false end
     if self.QuestWindowOpen() then return false end
+    if self:Awaited(itemID) then return false end
     self.asked[itemID] = true
+    -- Waiting on the server for this one. Only its answer counts; the client
+    -- says the same event again whenever it loads the item for anyone else.
+    self.pending = self.pending or {}
+    self.pending[itemID] = true
+    self.askedAt = self.askedAt or {}
+    self.askedAt[itemID] = self.Now()
     self.tries[itemID] = (self.tries[itemID] or 0) + 1
     local C = _G.C_Item
     local request = C and C.RequestLoadItemDataByID
@@ -601,6 +616,21 @@ function Finder:Request(itemID)
         Read(C and C.GetItemInfo or _G.GetItemInfo, itemID)
     end
     return true
+end
+
+--- Was the server asked about this item a moment ago, with no answer yet?
+--- Its answer is still due, so asking again would only spend a try.
+function Finder:Awaited(itemID)
+    if not (self.pending and self.pending[itemID]) then return false end
+    local at = self.askedAt and self.askedAt[itemID]
+    if type(at) ~= "number" then return false end
+    local waited = self.Now() - at
+    return waited >= 0 and waited < ANSWER_WAIT
+end
+
+--- Has the server been asked about this item as often as it will be?
+function Finder:GaveUp(itemID)
+    return self.tries ~= nil and (self.tries[itemID] or 0) >= ASK_TRIES
 end
 
 --- Is the game's quest giver window (offer, progress or hand-in) open?
@@ -686,11 +716,40 @@ local function WornStatsRead()
     return read
 end
 
+--- The gear worn as one string, by item string only. A worn link the
+--- client has let go of reads with no name ("[]"), and its name coming and
+--- going must not count as a gear change: that threw every verdict away
+--- and the window scanned over and over (a player's report, 2026-11-13).
+local function WornKey()
+    local parts = {}
+    for slot = 1, 19 do
+        local link = Items:Equipped(slot)
+        parts[slot] = link and (link:match("item:[^|%[]+") or link) or "-"
+    end
+    return table.concat(parts, ";")
+end
+Finder.WornKey = WornKey
+
+--- The worn gear's key, the most of its stats ever read for that gear, and
+--- how many read now. The client lets worn gear go from its memory now and
+--- then; the count falling then is not a change, and judging meanwhile
+--- would weigh every item against nothing.
+function Finder:WornState()
+    local key, read = WornKey(), WornStatsRead()
+    if key ~= self.wornKey then
+        self.wornKey, self.wornBest = key, read
+    elseif read > (self.wornBest or 0) then
+        self.wornBest = read
+    end
+    return key, self.wornBest, read
+end
+
 function Finder:JudgeKey()
     -- Worn gear whose stats had not loaded yet (just after login) scores
-    -- nothing, so its count is part of the key too.
+    -- nothing, so the most of its stats read is part of the key too.
+    local wornKey, wornBest = self:WornState()
     return table.concat({
-        tostring(Items:WornSignature()), tostring(WornStatsRead()), tostring(Items:PlayerLevel()),
+        tostring(wornKey), tostring(wornBest), tostring(Items:PlayerLevel()),
         tostring(Weights.generation or 0), tostring(self.judgeGeneration or 0),
         -- A character skipped for upgrades has none (Alts:SetSkipped).
         tostring(ns.Alts and ns.Alts:PlayerSkipped() or false),
@@ -711,7 +770,7 @@ end
 --- Forget the kept verdicts (talents or weapon skills changed).
 function Finder:ForgetVerdicts()
     self.judgeGeneration = (self.judgeGeneration or 0) + 1
-    self.stale = true
+    self:MarkStale()
 end
 
 --- One item's verdict, judged once per Judged() set. Gear with random rolls
@@ -783,6 +842,9 @@ end
 function Finder:Build(only, ahead, pause)
     local player = self:Player()
     if not player then return nil, "nolevel" end
+    -- What had changed when this scan began. A sliced scan runs over many
+    -- frames, and a change that lands meanwhile leaves it out of date.
+    local changes = self.changes or 0
 
     local weights = Weights:ForPlayer()
     if not weights then return nil, "noweights" end
@@ -808,16 +870,47 @@ function Finder:Build(only, ahead, pause)
     local judgedKey = self.judgedKey
     local worn = Compare:WornIDs()
     local slots, checked, waiting, asked = {}, 0, 0, 0
+    local queue = {}
+    -- Items an earlier scan asked about a moment ago, their answers still due.
+    local held = 0
+    -- Worn gear the client let go of: ask for it back, and judge nothing new
+    -- until it is in, since every item would be weighed against nothing.
+    local _, wornBest, wornRead = self:WornState()
+    local wornShort = wornRead < (wornBest or 0)
+    if wornShort then
+        for slot = 1, 19 do
+            local link = Items:Equipped(slot)
+            local id = link and tonumber(link:match("item:(%d+)"))
+            if id and not Items:Stats(link) then self:Request(id) end
+        end
+    end
     for _, candidate in ipairs(self:Candidates(plan, only, pause)) do
         if pause then pause() end
         local itemID = candidate.itemID
-        local wearable = not carried[itemID] and Wearable(player.class, itemID)
+        -- An item judged before keeps its verdict, even when the client has
+        -- let go of its details since: asking again would start the scans
+        -- over and over, and the list would change each time.
+        local kept = not carried[itemID] and not worn[itemID] and judged[itemID] ~= nil
+        local wearable = kept or (not carried[itemID] and Wearable(player.class, itemID))
         if wearable ~= false then
-            if wearable == nil or not self:IsCached(itemID) then
-                waiting = waiting + 1
-                if asked < ASK_PER_SCAN and self:Request(itemID) then
-                    asked = asked + 1
+            if not kept and (wearable == nil or not self:IsCached(itemID)) then
+                -- One the server never answered is not waited on for ever.
+                if not self:GaveUp(itemID) then
+                    waiting = waiting + 1
+                    if self:Awaited(itemID) then
+                        -- Asked by the scan before this one. It counts
+                        -- toward this batch and is not asked twice.
+                        held = held + 1
+                    elseif asked + held < ASK_PER_SCAN then
+                        if self:Request(itemID) then asked = asked + 1 end
+                    else
+                        -- Asked for a batch at a time once these answers
+                        -- settle (AskMore), without scanning again.
+                        queue[#queue + 1] = itemID
+                    end
                 end
+            elseif not kept and wornShort then
+                waiting = waiting + 1
             elseif not worn[itemID] then
                 local best, ok, result = self:JudgeOnce(judged, itemID)
                 if ok and result then
@@ -861,7 +954,17 @@ function Finder:Build(only, ahead, pause)
     }
     if not only and reach == level then
         self.latest, self.latestAt, self.latestKey = found, self.Now(), judgedKey
+        -- A whole scan with nothing changed meanwhile is up to date, whoever
+        -- made it, so the upgrade quest and the character sheet read this
+        -- one and start no second scan of their own.
+        if (self.changes or 0) == changes then self.stale = false end
     end
+    -- What this scan left unasked. Set only by a scan that finished, so one
+    -- dropped half way keeps the list the last whole scan made.
+    self.queue = queue
+    -- Something is due from the server. If none of it comes, the next step
+    -- is taken anyway, so a batch the server drops is not waited on for ever.
+    if asked > 0 or held > 0 then self:WaitForAnswers() end
     return found
 end
 
@@ -914,12 +1017,14 @@ function Finder.Now()
 end
 
 --- The latest scan of everything for now, made again (in the background,
---- once there is one) when the gear, the level or the bags changed since, at
---- most every few seconds. For the character sheet's slots, which ask on
---- every hover.
+--- once there is one) only when something it reads changed since: the gear
+--- worn, the level, a setting. For the character sheet's slots, which ask
+--- on every hover. No clock makes it old.
 function Finder:Latest()
     if self.background then return self.latest end
-    local fresh = self.latest and not self.stale and (self.Now() - (self.latestAt or 0)) < 60
+    -- Kept until something it reads changes (an event marks it stale, the
+    -- key catches one whose event was missed).
+    local fresh = self.latest and not self.stale and self.latestKey == self:JudgeKey()
     if not fresh and (not self.latest or (self.Now() - (self.latestAt or 0)) >= 2) then
         -- Made a slice per frame, the last one kept on show meanwhile. The
         -- very first is too: done in one go, a hover froze the game.
@@ -934,8 +1039,171 @@ function Finder:Asked(itemID)
     return ok and id ~= nil and self.asked ~= nil and self.asked[id] == true
 end
 
+--- Something the scan reads changed (gear worn, level, a setting). The
+--- next scan may look once more when the items it asked about come in.
 function Finder:MarkStale()
     self.stale = true
+    self.followUp = true
+    self.changes = (self.changes or 0) + 1
+end
+
+-- How long after the last answer the server sent about items a scan asked
+-- for before it counts as settled. The answers come in bursts of dozens.
+local ANSWER_SETTLE = 2
+Finder.ANSWER_SETTLE = ANSWER_SETTLE
+
+Finder.ANSWER_WAIT = ANSWER_WAIT
+
+--- What wants to hear once a burst of item answers has settled, each
+--- called with two arguments: true when the scan may be made again (the
+--- upgrade quest looks only then), and true when nothing more was asked for
+--- just now, so every answer the last scan waited on is in (the open finder
+--- window scans again only on one of the two).
+Finder.answerWatchers = Finder.answerWatchers or {}
+
+function Finder:WatchAnswers(fn)
+    if type(fn) == "function" then self.answerWatchers[#self.answerWatchers + 1] = fn end
+end
+
+--- The burst of answers is over. Only the first burst after a real change
+--- makes the scan out of date; the scan after that asks about more items,
+--- and their answers must not start another, or it never stops (a full
+--- scan every few seconds until every item in the data has loaded).
+function Finder:AnswersSettled()
+    local again = self.followUp == true
+    self.followUp = false
+    if again then
+        self.stale = true
+        self.changes = (self.changes or 0) + 1
+    end
+    -- The items the last scan had no room to ask about are asked for here,
+    -- a batch at a time, with no scan in between: scanning the whole list
+    -- for every batch froze the game every few seconds until all were in.
+    local done = true
+    if not again and self:KeepsAsking() then
+        done = self:AskMore() == 0
+    end
+    for _, fn in ipairs(self.answerWatchers) do
+        local ok, err = pcall(fn, again, done)
+        if not ok then ns.Debug("finder:", tostring(err)) end
+    end
+    return again, done
+end
+
+--- Should the items a scan left unasked be asked for as answers come in?
+--- Only while something that shows them is up (the finder window says).
+function Finder:KeepsAsking()
+    local fn = self.keepAsking
+    if type(fn) ~= "function" then return false end
+    local ok, yes = pcall(fn)
+    return ok and yes and true or false
+end
+
+--- Ask the server about the next batch the last scan left unasked.
+--- @return how many answers are now due (asked here, or a moment ago)
+function Finder:AskMore()
+    local queue = self.queue
+    local asked, held = 0, 0
+    -- First what was asked before and never answered: the server drops some
+    -- of a burst. Asked again here, with no scan in between, until each has
+    -- had its tries. One asked a moment ago is left to wait.
+    for itemID in pairs(self.pending or {}) do
+        if self:GaveUp(itemID) then
+            -- Left as it is: should its answer come late, it still counts.
+        elseif self:IsCached(itemID) then
+            -- The client has it now, though its answer was never heard.
+            self.pending[itemID] = nil
+        elseif self:Awaited(itemID) then
+            held = held + 1
+        elseif asked < ASK_PER_SCAN and self:Request(itemID) then
+            asked = asked + 1
+        end
+    end
+    while queue and #queue > 0 and asked < ASK_PER_SCAN do
+        local itemID = table.remove(queue)
+        if not self:IsCached(itemID) and self:Request(itemID) then
+            asked = asked + 1
+        end
+    end
+    if asked > 0 or held > 0 then self:WaitForAnswers() end
+    return asked + held
+end
+
+--- A batch was asked for. Should not one answer come within ANSWER_WAIT
+--- seconds, go on as if they had settled, so the rest are still asked for.
+function Finder:WaitForAnswers()
+    local after = _G.C_Timer and _G.C_Timer.After
+    if type(after) ~= "function" then return end
+    local mine = self.answers or 0
+    self.waits = (self.waits or 0) + 1
+    local wait = self.waits
+    after(ANSWER_WAIT, function()
+        if Finder.waits == wait and (Finder.answers or 0) == mine then
+            Finder:AnswersSettled()
+        end
+    end)
+end
+
+--- GET_ITEM_INFO_RECEIVED: an answer about an item a scan asked for waits
+--- until no more have come for ANSWER_SETTLE seconds. Without timers it
+--- counts at once.
+function Finder:OnItemAnswer(itemID)
+    -- One answer for each time we asked. An item asked about once is loaded
+    -- again and again by the client (a tooltip, a link, our own list), and
+    -- each of those used to start another scan with the window open.
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    local pending = self.pending
+    if not (ok and id and pending and pending[id]) then return false end
+    pending[id] = nil
+    -- Each answer starts its own wait; only the wait of the last answer in
+    -- a burst finds the count unchanged and settles.
+    self.answers = (self.answers or 0) + 1
+    local mine = self.answers
+    local after = _G.C_Timer and _G.C_Timer.After
+    if type(after) ~= "function" then
+        self:AnswersSettled()
+        return true
+    end
+    after(ANSWER_SETTLE, function()
+        if Finder.answers == mine then Finder:AnswersSettled() end
+    end)
+    return true
+end
+
+--- The gear the finder could list that is in the bags, as one string:
+--- only that changes a scan (Carried leaves it out). Sorted by item ID, so
+--- moving a piece or a stack growing says nothing changed.
+function Finder:CarriedSignature()
+    local items = ns.Sources and ns.Sources.ITEMS or {}
+    local forever = ns.Sources and ns.Sources.FOREVER or {}
+    local crafts = ns.Crafts and ns.Crafts.ITEMS or {}
+    local seen, ids = {}, {}
+    for id in pairs(self:Carried()) do
+        if not seen[id] and (items[id] or forever[id] or crafts[id]) then
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
+    end
+    table.sort(ids)
+    return table.concat(ids, ",")
+end
+
+--- Did the gear the finder could list in the bags change since `who` last
+--- asked? True the first time each asks.
+function Finder:CarriedMoved(who)
+    local ok, now = pcall(self.CarriedSignature, self)
+    if not ok then return true end
+    self.carriedSeen = self.carriedSeen or {}
+    local key = who or "finder"
+    if self.carriedSeen[key] == now then return false end
+    self.carriedSeen[key] = now
+    return true
+end
+
+--- BAG_UPDATE_DELAYED: a scan is out of date only when gear it could list
+--- came into or left the bags. Loot, crafting and stacks leave it alone.
+function Finder:OnBags()
+    if self:CarriedMoved("finder") then self:MarkStale() end
 end
 
 --------------------------------------------------------------------------------
@@ -1047,14 +1315,15 @@ function Finder:ScanSliced(only, ahead, done)
 end
 
 function Finder:OnEnable()
-    for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED",
+    for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP",
         "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, self.MarkStale)
     end
+    ns.RegisterEvent(self, "BAG_UPDATE_DELAYED", self.OnBags)
     -- Only answers a scan asked for: the client loads items for chat links
-    -- and the auction house all the time.
+    -- and the auction house all the time. Counted once the burst settles.
     ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
-        if Finder:Asked(itemID) then Finder:MarkStale() end
+        Finder:OnItemAnswer(itemID)
     end)
     ns.RegisterEvent(self, "QUEST_TURNED_IN", self.OnQuestTurnedIn)
     -- Talents move the spec the weights come from: Forever's trait tree,
@@ -1062,6 +1331,8 @@ function Finder:OnEnable()
     for _, event in ipairs({ "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, self.ForgetVerdicts)
     end
+    -- Passed on only when a skill is learned or dropped (ns.NothingChanged),
+    -- never for a skill point.
     ns.RegisterEvent(self, "SKILL_LINES_CHANGED", self.ForgetVerdicts)
 end
 

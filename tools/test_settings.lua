@@ -237,6 +237,18 @@ do
 end
 suite.check("sizes read through the step", ns.Theme.sizes.small == ns.Theme.BASE_SIZES.small)
 
+-- Mute All Sounds: the box, the command and every sister agree.
+suite.check("Mute All Sounds starts off", not ns.Muted() and not controls.muteSounds:GetChecked())
+controls.muteSounds:GetScript("OnClick")(controls.muteSounds)
+suite.check("ticked, every Blackthornes sound is muted", ns.Muted() == true
+    and ns.db.muteSounds == true and type(ns.db.muteSoundsAt) == "number")
+ns.commands.mute.fn("off")
+suite.check("/beq mute off plays them again", ns.Muted() == false and ns.db.muteSounds == false)
+ns.commands.mute.fn("")
+suite.check("/beq mute alone flips it", ns.Muted() == true)
+ns.commands.mute.fn("off")
+suite.check("and back off", ns.Muted() == false)
+
 -- The command buttons run their commands.
 local ran = {}
 local realSlash = ns.HandleSlash
@@ -255,7 +267,7 @@ local covered = { sisters = true, whatsnew = true,
     window = true, find = true, quest = true, arrow = true,
     spec = true, weights = true,
     settings = true, weapons = true, training = true, skip = true, autoequip = true,
-    dungeons = true, loot = true,
+    dungeons = true, loot = true, mute = true, windows = true,
 }
 local typedOnly = { bags = true, tracked = true, help = true }
 for _, name in ipairs(ns.commandOrder) do
@@ -298,7 +310,10 @@ SettingsUI:Refresh()
 ns.db.settingsX = 400
 controls.resetPositions:GetScript("OnClick")(controls.resetPositions)
 suite.check("Set Default forgets where it was dragged", ns.db.settingsX == nil)
-suite.check("and says so", env.chat[#env.chat]:find("UI windows set to defaults.", 1, true) ~= nil, env.chat[#env.chat])
+suite.check("and says so", env.chat[#env.chat]:find("Every window is back in its first spot.", 1, true) ~= nil, env.chat[#env.chat])
+ns.db.settingsX = 400
+ns.commands.windows.fn("reset")
+suite.check("/beq windows reset does the same", ns.db.settingsX == nil)
 
 -- A client with neither options API still loads.
 local ns2 = env.Load()

@@ -74,16 +74,15 @@ UpgradeQuest.NONE = NONE
 UpgradeQuest.states = {}
 
 -- A tab with nothing to pick is only looked at again when something that can
--- open new gear happens (gear, level, talents, recipes, quests handed in, item
--- answers) or the player asks, so looting and quest log ticks stay cheap.
--- A bag change looks again at most once a minute (gear sold or thrown away
--- can be picked again). Not saved.
+-- open new gear happens: a new zone, the gear worn, the level, talents, a
+-- recipe or skill learned (the client passes SKILL_LINES_CHANGED on only then),
+-- a setting, or the player asks. Looting, the bags, the quest log, skill
+-- points and item answers never start a search by themselves. Not saved.
 UpgradeQuest.rescan = true
-local BAG_RESCAN = 60
 local RESCAN_ON = {
-    PLAYER_EQUIPMENT_CHANGED = true, PLAYER_LEVEL_UP = true, QUEST_TURNED_IN = true,
-    GET_ITEM_INFO_RECEIVED = true, SKILL_LINES_CHANGED = true, NEW_RECIPE_LEARNED = true,
-    TRAIT_CONFIG_UPDATED = true, CHARACTER_POINTS_CHANGED = true, PLAYER_TALENT_UPDATE = true,
+    PLAYER_EQUIPMENT_CHANGED = true, PLAYER_LEVEL_UP = true, NEW_RECIPE_LEARNED = true,
+    TRAIT_CONFIG_UPDATED = true, SKILL_LINES_CHANGED = true,
+    CHARACTER_POINTS_CHANGED = true, PLAYER_TALENT_UPDATE = true,
 }
 
 local Items = ns.Items
@@ -340,6 +339,36 @@ function UpgradeQuest:ZoneOnly()
     return ns.db ~= nil and ns.db.upgradeQuestZoneOnly == true
 end
 
+--- Does the quest keep to the zone the character is in? It does while
+--- "This zone only" is ticked on the quest panel or in Where to get
+--- upgrades (`finderZoneOnly`; a player's report, 2026-11-13: the window
+--- kept to the zone and the quest did not).
+function UpgradeQuest:KeepsToZone()
+    return self:ZoneOnly() or (ns.db ~= nil and ns.db.finderZoneOnly == true)
+end
+
+--- Would Where to get upgrades list this source? The quest picks only what
+--- the window's own filters let through: a source box left unticked
+--- (`finderSourcesOff`, "raid" for a raid's drop) and "Only what I can get
+--- now" (`finderGetNow`: no craft that you or your other characters can't
+--- make yet). Read straight from the save, so the window need not be open.
+function UpgradeQuest.WindowAllows(source, pick)
+    if type(source) ~= "table" then return false end
+    local db = ns.db
+    if not db then return true end
+    local kind = source.kind
+    if kind == "dungeon" and source.raid then kind = "raid" end
+    -- How You Gear Up: No Dungeons leaves dungeon and raid drops out.
+    if source.kind == "dungeon" and UpgradeQuest:Sets("noDungeon") then return false end
+    local off = db.finderSourcesOff
+    if type(off) == "table" and kind and off[kind] == true then return false end
+    if db.finderGetNow == true then
+        if type(pick) == "table" and pick.needs then return false end
+        if source.kind == "craft" and source.state ~= "known" and source.state ~= "alt" then return false end
+    end
+    return true
+end
+
 --- Does a new zone let go of the tabs' quests elsewhere while "This zone
 --- only" is ticked? Saved account wide as `upgradeQuestZoneSwap`, on
 --- unless unticked (the owner asked 2026-10-08 for a way to stop it).
@@ -403,11 +432,13 @@ function UpgradeQuest.SourceZone(source)
 end
 
 --- The easiest of a pick's sources (only those for one tab, when `tab` is
---- given, and only those in the zone `here`, when it is), and how easy it is.
-function UpgradeQuest.BestSource(sources, zone, tab, here)
+--- given, only those in the zone `here`, when it is, and with `filtered`
+--- only those Where to get upgrades' filters let through), and how easy it is.
+function UpgradeQuest.BestSource(sources, zone, tab, here, filtered)
     local best, bestEase
     for _, source in ipairs(sources or {}) do
-        if (not tab or source.kind == tab) and UpgradeQuest.InZone(source, here) then
+        if (not tab or source.kind == tab) and UpgradeQuest.InZone(source, here)
+            and (not filtered or UpgradeQuest.WindowAllows(source)) then
             local ease = UpgradeQuest.Ease(source, zone)
             if not best or ease > bestEase then best, bestEase = source, ease end
         end
@@ -420,6 +451,8 @@ end
 local function Worth(result, gain, ease)
     -- Filling an empty slot counts as a big step up.
     if result and result.empty then gain = math.max(gain, 1) * 1.5 end
+    -- "Easy picks first" (How You Gear Up: Quick and Close) leans harder on ease.
+    if UpgradeQuest:Sets("easy") then return gain * ease * ease end
     return gain * ease
 end
 
@@ -436,12 +469,16 @@ function UpgradeQuest:Choose(found, except, tab)
     local skipped = self:Skipped()
     local zone = found.player and found.player.zone
     -- Read now: the scan may be from before the last zone change.
-    local here = self:ZoneOnly() and (self.Zone() or zone) or nil
+    local here = self:KeepsToZone() and (self.Zone() or zone) or nil
     local everything = type(found.all) == "table" and found.all or nil
     -- Only a few of the best per slot are kept for the finder's window; the
     -- best in this zone is seldom among them, so look at them all.
     local slots = here and everything or found.slots
     local best, bestRep
+    -- The most gain and the easiest source seen, so the pick can say why
+    -- it was chosen (`best.why`).
+    local most = { gain = 0, ease = 0 }
+    local mostRep = { gain = 0, ease = 0 }
     -- The slots whose short list holds reputation gear.
     local crowded = {}
     local function Look(slot, list, repToo)
@@ -449,14 +486,17 @@ function UpgradeQuest:Choose(found, except, tab)
             if pick.rep then crowded[slot] = true end
             if not pick.needs and not pick.remote and not pick.at and not skipped[pick.itemID]
                 and not (except and except[pick.itemID]) and (repToo or not pick.rep) then
-                local source, ease = self.BestSource(pick.sources, zone, tab, here)
+                local source, ease = self.BestSource(pick.sources, zone, tab, here, true)
                 if source then
                     local worth = Worth(pick.result, pick.gain or 0, ease)
+                    local top = pick.rep and mostRep or most
+                    top.gain = math.max(top.gain, pick.gain or 0)
+                    top.ease = math.max(top.ease, ease)
                     local held = best
                     if pick.rep then held = bestRep end
                     if not held or worth > held.worth
                         or (worth == held.worth and pick.itemID < held.pick.itemID) then
-                        held = { pick = pick, source = source, worth = worth }
+                        held = { pick = pick, source = source, worth = worth, ease = ease }
                         if pick.rep then bestRep = held else best = held end
                     end
                 end
@@ -471,11 +511,23 @@ function UpgradeQuest:Choose(found, except, tab)
             if type(everything[slot]) == "table" then Look(slot, everything[slot], false) end
         end
     end
-    return best or bestRep
+    local chosen, top = best, most
+    if not chosen then chosen, top = bestRep, mostRep end
+    if chosen then chosen.why = UpgradeQuest.Why(chosen.pick.gain or 0, chosen.ease or 0, top) end
+    return chosen
+end
+
+--- Why a pick was chosen over the rest on its tab: "biggest" when nothing
+--- gains more, "easiest" when nothing is easier to get, else "mix".
+function UpgradeQuest.Why(gain, ease, top)
+    if type(top) ~= "table" then return "mix" end
+    if gain >= (top.gain or 0) then return "biggest" end
+    if ease >= (top.ease or 0) then return "easiest" end
+    return "mix"
 end
 
 --- Make a pick the quest on its source's tab.
-function UpgradeQuest:Start(pick, source)
+function UpgradeQuest:Start(pick, source, why)
     local char = ns.charDB
     local tab = self.TabOf(source)
     if not (char and pick and tab) then return nil end
@@ -488,7 +540,10 @@ function UpgradeQuest:Start(pick, source)
         source = Copy(source),
         -- Picked while "This zone only" was ticked: let go when it is
         -- unticked, so the tab picks again from anywhere.
-        here = self:ZoneOnly() or nil,
+        here = self:KeepsToZone() or nil,
+        -- Why it was picked ("biggest", "easiest", "mix" or "picked"), for
+        -- the line under the item on the panel.
+        why = why,
     }
     self:Quests()[tab] = quest
     self:Mirror()
@@ -527,7 +582,7 @@ function UpgradeQuest:Follow(pick)
     if not source then return nil, why end
     self:Skipped()[pick.itemID] = nil
     self.declined[pick.itemID] = nil
-    local quest = self:Start(pick, source)
+    local quest = self:Start(pick, source, "picked")
     if not quest then return nil, L["nothing to follow"] end
     -- Picked by hand: "This zone only" never lets it go.
     quest.followed = true
@@ -610,7 +665,46 @@ function UpgradeQuest:WorthLooking(empty)
     for _, tab in ipairs(empty) do
         if self.states[tab] ~= "none" then return true end
     end
-    return self.bagsChanged and Now() - (self.lookedAt or 0) >= BAG_RESCAN or false
+    return false
+end
+
+--- The finder's key for the verdicts it keeps, or nil when it can't say.
+local function JudgeKeyNow()
+    local finder = ns.Finder
+    if not (finder and type(finder.JudgeKey) == "function") then return nil end
+    local ok, key = pcall(finder.JudgeKey, finder)
+    return ok and key or nil
+end
+
+--- A tab let this upgrade go because the game, asked now, says it is no
+--- upgrade to wear (beaten, lighter armor, a hidden weapon, a two-hander
+--- for a shield tank). The finder keeps its verdicts until gear, level or
+--- a setting moves, and the two can disagree (a buff's hit, worn gear the
+--- client let go of). Picked straight back, it would be let go again, with
+--- a whole scan each time, for as long as the panel is up. So it is kept
+--- out of the picks until the finder's own key moves. Session only.
+function UpgradeQuest:LetGo(itemID)
+    if type(itemID) ~= "number" then return end
+    self.letGo = self.letGo or {}
+    self.letGo[itemID] = JudgeKeyNow() or false
+end
+
+--- The upgrades let go while gear, level and settings stand as they do
+--- now, as `[itemID] = true` for Choose, or nil. Older ones are forgotten.
+function UpgradeQuest:LetGoNow()
+    local list = self.letGo
+    if type(list) ~= "table" or next(list) == nil then return nil end
+    local key = JudgeKeyNow()
+    local except
+    for itemID, at in pairs(list) do
+        if key and at == key then
+            except = except or {}
+            except[itemID] = true
+        else
+            list[itemID] = nil
+        end
+    end
+    return except
 end
 
 --- Give every tab without a quest its best upgrade, and pick the tab the
@@ -624,7 +718,7 @@ function UpgradeQuest:PickEmpty()
     if #empty == 0 and IS_TAB[ns.charDB.upgradeQuestTab] then return end
     -- "This zone only" on a flight: the zone below is not where the player
     -- is going, so the tabs wait for the landing.
-    if self:ZoneOnly() and self.OnTaxi() then return end
+    if self:KeepsToZone() and self.OnTaxi() then return end
     if not self:WorthLooking(empty) then return end
 
     local found, why = self:Look()
@@ -633,15 +727,15 @@ function UpgradeQuest:PickEmpty()
         return
     end
     self.rescan = false
-    self.bagsChanged = false
-    self.lookedAt = Now()
+    -- What a tab just let go is not picked straight back (see LetGo).
+    local except = self:LetGoNow()
     for _, tab in ipairs(empty) do
-        local best = self:Choose(found, nil, tab)
-        if best then self:Start(best.pick, best.source) end
+        local best = self:Choose(found, except, tab)
+        if best then self:Start(best.pick, best.source, best.why) end
         self.states[tab] = best and "active" or "none"
     end
     if not IS_TAB[ns.charDB.upgradeQuestTab] then
-        local best = self:Choose(found)
+        local best = self:Choose(found, except)
         ns.charDB.upgradeQuestTab = best and self.TabOf(best.source) or "vendor"
     end
 end
@@ -1306,6 +1400,12 @@ function UpgradeQuest:LighterArmor(quest)
     return ok and type(result) == "table" and result.lighterArmor == true
 end
 
+--- Is the quest's item a two-hander, while judged as a shield tank spec?
+function UpgradeQuest:TankTwoHand(quest)
+    local ok, result = pcall(ns.Compare.Judge, ns.Compare, quest.link)
+    return ok and type(result) == "table" and result.tankTwoHand == true
+end
+
 --- Is the quest's item a weapon this character hides until trained
 --- (Settings' Untrained Weapons on Hide, or its type ignored from a banner)?
 function UpgradeQuest:HiddenWeapon(quest)
@@ -1384,6 +1484,7 @@ function UpgradeQuest:LookForBetter(quest)
     self.offer = {
         pick = best.pick,
         source = best.source,
+        why = best.why,
         questItemID = quest.itemID,
         level = (found.player and found.player.level) or self.newLevel,
         howMuch = best.pick.result and ns.Compare:HowMuch(best.pick.result) or nil,
@@ -1405,7 +1506,7 @@ function UpgradeQuest:SwitchToOffer()
     local offer = self.offer
     if not offer then return false end
     self.offer = nil
-    self:Start(offer.pick, offer.source)
+    self:Start(offer.pick, offer.source, offer.why)
     self.lastStep = nil
     self:Update()
     return true
@@ -1476,23 +1577,28 @@ function UpgradeQuest:Check()
             if not completed[quest.itemID] then
                 completed[quest.itemID] = true
                 ns.charDB.upgradeQuestsDone = self:DoneCount() + 1
-                if ns.Toast then
+                local cheered = ns.UpgradeDone
+                    and select(2, pcall(ns.UpgradeDone.Show, ns.UpgradeDone, quest, self:DoneCount())) == true
+                if not cheered and ns.Toast then
                     ns.Toast:Show({ title = L["Upgrade quest complete"], link = quest.link,
                         text = L.Format("That's %d upgrade quests done. Picking your next one.", self:DoneCount()) })
                 end
             end
             if ns.Finder then ns.Finder:MarkStale() end
-        elseif quest and (self:LighterArmor(quest) or self:HiddenWeapon(quest)) then
-            -- Best Armor Only was ticked, or an untrained weapon hidden,
-            -- after this was picked (followed by hand too): let it go
+        elseif quest and (self:LighterArmor(quest) or self:HiddenWeapon(quest)
+            or self:TankTwoHand(quest)) then
+            -- Best Armor Only was ticked, an untrained weapon hidden, or
+            -- Protection picked for a two-hander, after this was picked (followed by hand too): let it go
             -- quietly (not skipped), and the tab picks again.
             quests[tab.key] = nil
+            self:LetGo(quest.itemID)
             if ns.Finder then ns.Finder:MarkStale() end
         elseif quest and not self:StillWanted(quest) then
             -- Something as good or better was put on first (looted, bought,
             -- made): this one is beaten, carried or not. Only the tab on
             -- show says so; the others quietly pick again.
             quests[tab.key] = nil
+            self:LetGo(quest.itemID)
             if shown then
                 ns.Print(L.Format("dropped the upgrade quest for %s, since you're already wearing something as good.", Items.ShowLink(quest.link)))
                 if ns.Toast then
@@ -1719,7 +1825,7 @@ end
 --- nothing is let go on a flight or inside a dungeon (UpgradeQuest.Passing).
 -- @return true when one was let go
 function UpgradeQuest:LetGoOutOfZone()
-    if not self:ZoneOnly() or self.Passing() then return false end
+    if not self:KeepsToZone() or self.Passing() then return false end
     local here = self.Zone()
     if not here then return false end
     local quests = self:Quests()
@@ -1743,7 +1849,7 @@ function UpgradeQuest:SetZoneOnly(on)
     ns.db.upgradeQuestZoneOnly = on and true or false
     if on then
         self:LetGoOutOfZone()
-    else
+    elseif not self:KeepsToZone() then
         local quests = self:Quests()
         for _, tab in ipairs(TABS) do
             local quest = Valid(quests[tab.key])
@@ -1755,6 +1861,58 @@ function UpgradeQuest:SetZoneOnly(on)
     self.offer = nil
     self.lastStep = nil
     if self:IsEnabled() then self:Update() else self:Changed() end
+end
+
+--- Where to get upgrades' "This zone only", source boxes or "Only what I
+--- can get now" changed. The tabs' quests those filters now leave out are
+--- let go (not skipped, so they can come back), as is a quest picked while
+--- a zone box was ticked once neither is; a quest followed from the window
+--- stays. Then each empty tab picks again.
+function UpgradeQuest:WindowFiltersChanged()
+    if not ns.db then return end
+    local keeps = self:KeepsToZone()
+    if keeps then self:LetGoOutOfZone() end
+    local quests = self:Quests()
+    for _, tab in ipairs(TABS) do
+        local quest = Valid(quests[tab.key])
+        if quest and not quest.followed
+            and ((quest.here and not keeps) or not self.WindowAllows(quest.source)) then
+            quests[tab.key] = nil
+        end
+    end
+    self:Mirror()
+    self.rescan = true
+    self.offer = nil
+    self.lastStep = nil
+    if self:IsEnabled() then self:Update() else self:Changed() end
+end
+
+--- Is this item one of the tabs' own upgrades?
+function UpgradeQuest:OwnItem(itemID)
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    if not (ok and id) then return false end
+    for _, quest in pairs(self:Quests()) do
+        if type(quest) == "table" and quest.itemID == id then return true end
+    end
+    return false
+end
+
+--- Has an answer about this own upgrade been looked at already, with the
+--- same gear, level and weights? Notes it when not. Not saved.
+function UpgradeQuest:OwnItemHeard(itemID)
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    if not (ok and id) then return false end
+    -- An answer that brought nothing (the client still lacks the item) is
+    -- not the one waited for: the next one counts.
+    local finder = ns.Finder
+    if finder and type(finder.IsCached) == "function" and not finder:IsCached(id) then
+        return false
+    end
+    local key = JudgeKeyNow() or false
+    self.ownHeard = self.ownHeard or {}
+    if self.ownHeard[id] == key then return true end
+    self.ownHeard[id] = key
+    return false
 end
 
 --- Is an item answer from the server about gear the quest cares about: an
@@ -1792,7 +1950,22 @@ function UpgradeQuest:OnEvent(event, level)
     if event == "PLAYER_ENTERING_WORLD" then newZone = true end
     -- The client loads items for chat links, vendors and other addons all
     -- the time; only answers this addon asked for are worth looking again.
-    if event == "GET_ITEM_INFO_RECEIVED" and not self:WantsItem(level) then return end
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        if not self:WantsItem(level) then return end
+        -- Answers to what a finder scan asked for come in bursts; the finder
+        -- tells us once they settle (WatchAnswers in OnEnable), so a burst
+        -- starts one scan, not one per answer.
+        local finder = ns.Finder
+        if finder and type(finder.WatchAnswers) == "function" and finder:Asked(level)
+            and not self:OwnItem(level) then
+            return
+        end
+        -- One of the tabs' own upgrades: its first answer lets it be judged
+        -- and its steps drawn. The panel reading its link loads it again,
+        -- and the client says so every time; that is nothing new until the
+        -- gear worn, the level or the weights move.
+        if self:OwnItemHeard(level) then return end
+    end
     if event == "PLAYER_LEVEL_UP" then
         -- Look for gear the new level opened, for a little while.
         self.levelledAt = ns.Finder and ns.Finder.Now() or Now()
@@ -1808,7 +1981,7 @@ function UpgradeQuest:OnEvent(event, level)
     -- so that waits for the landing.
     -- Unless "Change on a new zone" is unticked: then the quests stay, but
     -- a tab that found nothing in the last zone still looks in this one.
-    if newZone and self:ZoneOnly() then
+    if newZone and self:KeepsToZone() then
         if self.OnTaxi() then
             if self:ZoneSwap() then
                 self.landing = true
@@ -1821,8 +1994,19 @@ function UpgradeQuest:OnEvent(event, level)
             self:Mirror()
         end
         self.rescan = true
+    elseif newZone then
+        -- Any new zone may have upgrades a tab that found nothing can use.
+        -- On a flight, every zone flown over would start a search, so that
+        -- waits for the landing.
+        if self.OnTaxi() then
+            self.landing = true
+            self:WatchLanding()
+            return
+        end
+        self.rescan = true
     end
-    if event == "BAG_UPDATE_DELAYED" then self.bagsChanged = true end
+    -- The bags only change the steps (read again below), never start a
+    -- search: an upgrade new in the bags is told by UI/UpgradeChat.lua.
     self:UpdateSoon()
 end
 
@@ -1855,6 +2039,26 @@ function UpgradeQuest:OnEnable()
         ns.RegisterEvent(self, event, self.OnEvent)
     end
     if self:IsEnabled() then self:UpdateSoon(3) end
+end
+
+--- A weapon skill was really learned (WeaponSkills compares the known
+--- skills): a weapon that waited on it may be the next upgrade.
+function UpgradeQuest:SkillLearned()
+    if not self:IsEnabled() then return end
+    self.rescan = true
+    self:UpdateSoon()
+end
+
+-- Answers to what a finder scan asked for come in bursts; the finder says
+-- once a burst settles. Only the first burst after a real change looks
+-- again (`again`); the answers that look asks for start nothing more.
+if ns.Finder and type(ns.Finder.WatchAnswers) == "function" then
+    ns.Finder:WatchAnswers(function(again)
+        if again and UpgradeQuest:IsEnabled() then
+            UpgradeQuest.rescan = true
+            UpgradeQuest:UpdateSoon()
+        end
+    end)
 end
 
 --------------------------------------------------------------------------------
@@ -1940,6 +2144,284 @@ ns.RegisterCommand("quest", L["a quest for your next upgrade (/beq quest off, ig
     end
     UpgradeQuest:TurnOn()
 end)
+
+--------------------------------------------------------------------------------
+-- How You Gear Up (card D): one pick that sets the boxes for you
+--------------------------------------------------------------------------------
+
+-- Each style, in the order the drop-down lists them, and what it sets.
+-- Saved account wide as `upgradeQuestStyle` (nil for Anything, the
+-- default). A pick only ticks the same boxes the panel has (This Zone
+-- Only, Solo Quests Only) and runs one new pick, just as ticking them by
+-- hand does; "easy", "noDungeon" and "first" are read where the quest picks.
+UpgradeQuest.STYLES = {
+    { key = "anything", label = L["Anything"], sets = {} },
+    { key = "quick", label = L["Quick and Close"], sets = { zone = true, solo = true, easy = true } },
+    { key = "nodungeon", label = L["No Dungeons"], sets = { solo = true, noDungeon = true } },
+    { key = "dungeon", label = L["Dungeons Please"], sets = { first = "dungeon" } },
+    { key = "vendor", label = L["Vendors First"], sets = { first = "vendor" } },
+}
+local STYLE_OF = {}
+for _, style in ipairs(UpgradeQuest.STYLES) do STYLE_OF[style.key] = style end
+
+--- The style picked: one of UpgradeQuest.STYLES ("anything" when none).
+function UpgradeQuest:Style()
+    local key = ns.db and ns.db.upgradeQuestStyle
+    return STYLE_OF[key] or STYLE_OF.anything
+end
+
+--- Does the style picked set this? ("zone", "solo", "easy", "noDungeon",
+--- or "first" for the tab it puts first.)
+function UpgradeQuest:Sets(what)
+    return self:Style().sets[what]
+end
+
+--- What the style sets, in words, for "This sets:".
+function UpgradeQuest.StyleLines(style)
+    local sets, lines = style and style.sets or {}, {}
+    if sets.zone then lines[#lines + 1] = L["This Zone Only"] end
+    if sets.solo then lines[#lines + 1] = L["Solo Quests Only"] end
+    if sets.easy then lines[#lines + 1] = L["Easy picks first"] end
+    if sets.noDungeon then lines[#lines + 1] = L["No dungeon picks"] end
+    if sets.first == "dungeon" then lines[#lines + 1] = L["Dungeon picks first"] end
+    if sets.first == "vendor" then lines[#lines + 1] = L["Vendor picks first"] end
+    return lines
+end
+
+--- Pick a style. The boxes the old style ticked are unticked, the new one's
+--- ticked, and the quest picks again once.
+function UpgradeQuest:SetStyle(key)
+    if not ns.db then return end
+    local old, new = self:Style(), STYLE_OF[key] or STYLE_OF.anything
+    ns.db.upgradeQuestStyle = new.key ~= "anything" and new.key or nil
+    local finder = ns.Finder
+    if finder and (new.sets.solo or old.sets.solo) and (finder:SoloOnly() ~= (new.sets.solo == true)) then
+        ns.db.soloQuestsOnly = new.sets.solo == true
+    end
+    if new.sets.first then pcall(self.SelectTab, self, new.sets.first) end
+    if new.sets.zone or old.sets.zone then
+        self:SetZoneOnly(new.sets.zone == true)
+    end
+    -- Solo and No Dungeons are read where the quest picks, so let go of
+    -- what they now leave out and pick again (the finder hears too).
+    if finder and finder.QuestFilterChanged then finder:QuestFilterChanged() end
+    self:WindowFiltersChanged()
+end
+
+--- A box was ticked or unticked by hand: a style that needs it on no longer
+--- matches, so it reads Anything again (nothing else changes).
+function UpgradeQuest:BoxChanged(what, on)
+    if not ns.db or on then return end
+    if self:Sets(what) then ns.db.upgradeQuestStyle = nil end
+end
+
+--------------------------------------------------------------------------------
+-- What the panel shows about the quest (cards A, B, C, E, I, J)
+--------------------------------------------------------------------------------
+
+-- Why words by `why` and how far away; worked out once a quest and zone.
+local WHY_WORDS = {
+    biggest = { L["Biggest gain on this tab"], L["Biggest gain on this tab, in this zone"],
+        L["Biggest gain on this tab, 1 zone away"], L["Biggest gain on this tab, %d zones away"] },
+    easiest = { L["Easiest one on this tab"], L["Easiest one on this tab, in this zone"],
+        L["Easiest one on this tab, 1 zone away"], L["Easiest one on this tab, %d zones away"] },
+    mix = { L["Best mix of gain and ease on this tab"], L["Best mix of gain and ease on this tab, in this zone"],
+        L["Best mix of gain and ease on this tab, 1 zone away"], L["Best mix of gain and ease on this tab, %d zones away"] },
+}
+local whyKept = {}
+
+--- How many zones lie between the character and a quest's source: 0 here,
+--- nil when it can't be said.
+function UpgradeQuest.ZonesAway(source)
+    local here, there = UpgradeQuest.Zone(), UpgradeQuest.SourceZone(source)
+    if not (here and there) then return nil end
+    if here == there then return 0 end
+    local travel = ns.Travel
+    if not (travel and travel.ZonePath) then return nil end
+    local ok, path = pcall(travel.ZonePath, here, there)
+    if ok and type(path) == "table" and #path > 1 then return #path - 1 end
+    return nil
+end
+
+--- The dim line under the item that says why it was picked, or nil for a
+--- quest kept from before the reason was saved.
+function UpgradeQuest.WhyText(quest)
+    if type(quest) ~= "table" or not quest.why then return nil end
+    if quest.why == "picked" then return L["You picked this one"] end
+    local words = WHY_WORDS[quest.why]
+    if not words then return nil end
+    local zone = UpgradeQuest.Zone() or ""
+    local key = tostring(quest.itemID) .. "|" .. quest.why .. "|" .. zone
+    if whyKept[key] then return whyKept[key] end
+    local away = UpgradeQuest.ZonesAway(quest.source)
+    local text
+    if away == nil then text = words[1]
+    elseif away == 0 then text = words[2]
+    elseif away == 1 then text = words[3]
+    else text = L.Format(words[4], away) end
+    whyKept[key] = text
+    return text
+end
+
+--- The filters on now, in words, for the Options button's count and hover.
+function UpgradeQuest:FiltersOn()
+    local on = {}
+    if self:KeepsToZone() then on[#on + 1] = L["This Zone Only"] end
+    if ns.Finder and ns.Finder:SoloOnly() then on[#on + 1] = L["Solo Quests Only"] end
+    if ns.db and ns.db.finderGetNow == true then on[#on + 1] = L["Only What I Can Get Now"] end
+    if self:StepOnly() then on[#on + 1] = L["Current Step Only"] end
+    return on
+end
+
+--- The chips above the steps (card C): what the quest asks of you, each
+--- { text, met }. Kept until the quest, level or a standing moves.
+local chipsKept = {}
+function UpgradeQuest:Chips(quest)
+    if type(quest) ~= "table" then return {} end
+    local finder = ns.Finder
+    local player = finder and finder:Player()
+    local level = player and player.level or 0
+    local source = quest.source or {}
+    local needs = finder and finder:Needs(quest.itemID)
+    local key = table.concat({ tostring(quest.itemID), tostring(source.kind), tostring(level),
+        needs and tostring(needs.have) or "-" }, "|")
+    if chipsKept.key == key then return chipsKept.list end
+    local chips = {}
+    -- The item's own level.
+    local item = ns.Sources and ns.Sources.ITEMS[quest.itemID]
+    local want = ns.ForeverItems and ns.ForeverItems[quest.itemID] and ns.ForeverItems[quest.itemID].req
+    want = tonumber(want) or (item and tonumber(item[1])) or 0
+    if want > 1 then
+        chips[#chips + 1] = { text = L.Format("Needs level %d", want), met = level >= want }
+    end
+    if source.kind == "dungeon" and tonumber(source.minLevel) then
+        chips[#chips + 1] = { text = L.Format("Dungeon from %d", source.minLevel), met = level >= source.minLevel }
+    end
+    if source.kind == "quest" and source.questID and tonumber(source.chain) and source.chain > 0 then
+        local left = 0
+        if finder then
+            local chain, unknown = finder:Chain(source.questID)
+            left = #chain + (unknown and 1 or 0)
+        end
+        chips[#chips + 1] = { text = L.Format("Part of a %d quest chain", source.chain + 1), met = left == 0 }
+    end
+    local craft = ns.Crafts and ns.Crafts.ITEMS[quest.itemID]
+    local rep = (item and item.r) or (craft and craft.f)
+    if rep and finder then
+        local standing = finder.STANDINGS and finder.STANDINGS[rep[2] + 1] or "?"
+        local faction = (needs and needs.faction) or (ns.Sources.FACTIONS and ns.Sources.FACTIONS[rep[1]]) or L["a faction"]
+        chips[#chips + 1] = { text = L.Format("%s with %s", standing, faction), met = needs == nil }
+    end
+    chipsKept.key, chipsKept.list = key, chips
+    return chips
+end
+
+--- Is a pick one the quest could go after now (not waiting, not ignored)?
+local function Eligible(pick, skipped)
+    return type(pick) == "table" and not pick.needs and not pick.remote and not pick.at
+        and not skipped[pick.itemID]
+end
+
+--- The next best upgrades for the quest's slot (card E), from the list the
+--- finder already sorted: up to two { pick, source }, kept per scan.
+local alsoKept = {}
+function UpgradeQuest:AlsoGood(quest)
+    local finder = ns.Finder
+    local found = finder and finder.latest
+    if type(quest) ~= "table" or type(found) ~= "table" or type(found.all) ~= "table" then return {} end
+    local key = tostring(quest.itemID) .. "|" .. tostring(quest.slot)
+    if alsoKept.found == found and alsoKept.key == key then return alsoKept.list end
+    local list, skipped = {}, self:Skipped()
+    local zone = found.player and found.player.zone
+    for _, pick in ipairs(found.all[quest.slot] or {}) do
+        if #list >= 2 then break end
+        if pick.itemID ~= quest.itemID and Eligible(pick, skipped) then
+            local source = self.BestSource(pick.sources, zone, nil, nil, true)
+            if source then list[#list + 1] = { pick = pick, source = source } end
+        end
+    end
+    alsoKept.found, alsoKept.key, alsoKept.list = found, key, list
+    return list
+end
+
+-- The gear rating's steps (card I), lowest first.
+UpgradeQuest.RATINGS = {
+    { key = "poor", label = L["Poor"], below = 0.85 },
+    { key = "fair", label = L["Fair"], below = 0.93 },
+    { key = "good", label = L["Good"], below = 0.98 },
+    { key = "great", label = L["Great"] },
+}
+
+--- How the gear worn stands against the upgrades waiting (card I), from
+--- the finder's last scan: { score (0 to 100), rating, index, waiting },
+--- or nil before a scan. Kept per scan, so a redraw works nothing out.
+local ratingKept = {}
+function UpgradeQuest:GearRating()
+    local finder = ns.Finder
+    local found = finder and finder.latest
+    if type(found) ~= "table" or type(found.all) ~= "table" then return nil end
+    if ratingKept.found == found then return ratingKept.value end
+    local skipped = self:Skipped()
+    local slots, sum, waiting = 0, 0, 0
+    for slot = 1, 19 do
+        if slot ~= 4 and slot ~= 19 then
+            slots = slots + 1
+            local best
+            for _, pick in ipairs(found.all[slot] or {}) do
+                if Eligible(pick, skipped) then best = pick break end
+            end
+            if best then
+                waiting = waiting + 1
+                local result = best.result or {}
+                local ratio = 1 / (1 + (tonumber(result.percent) or 0) / 100)
+                if result.empty then ratio = 0 end
+                sum = sum + ratio
+            else
+                sum = sum + 1
+            end
+        end
+    end
+    local value = sum / math.max(slots, 1)
+    local index = #self.RATINGS
+    for i, rating in ipairs(self.RATINGS) do
+        if rating.below and value < rating.below then index = i break end
+    end
+    ratingKept.found = found
+    ratingKept.value = { score = math.floor(value * 100 + 0.5), rating = self.RATINGS[index], index = index,
+        waiting = waiting, level = found.player and found.player.level }
+    return ratingKept.value
+end
+
+--- Upgrades a quest in the log gives (card J): { percent, slot } for the
+--- best, from the finder's last scan, or nil. Laid out once a scan.
+local rewardsKept = {}
+function UpgradeQuest:RewardMark(questID)
+    local finder = ns.Finder
+    local found = finder and finder.latest
+    questID = tonumber(questID)
+    if not questID or type(found) ~= "table" or type(found.all) ~= "table" then return nil end
+    if rewardsKept.found ~= found then
+        local marks = {}
+        for slot, list in pairs(found.all) do
+            for _, pick in ipairs(list) do
+                if not pick.needs and not pick.remote and not pick.at and pick.result then
+                    for _, source in ipairs(pick.sources or {}) do
+                        if source.kind == "quest" and source.questID then
+                            local percent = tonumber(pick.result.percent) or 0
+                            local held = marks[source.questID]
+                            if not held or percent > held.percent then
+                                marks[source.questID] = { percent = percent, slot = pick.result.slot or slot,
+                                    empty = pick.result.empty }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        rewardsKept.found, rewardsKept.marks = found, marks
+    end
+    return rewardsKept.marks[questID]
+end
 
 -- A one-time card in the What's New window (the owner asked 2026-10-13, as
 -- many players miss the quest): shown once per account, and only while the

@@ -220,7 +220,7 @@ Compare.Capped = Capped
 -- @return against (number), empty (true when every slot it could go in is
 --         empty), equipped (true when this very item is already worn), and
 --         the slot it would go in (the weaker of a pair)
-function Compare:Against(link, equipLoc, weights)
+function Compare:Against(link, equipLoc, weights, shieldTank)
     local slots = SLOTS[equipLoc]
 
     -- A one-handed weapon also fits the off hand, for a character who can
@@ -270,8 +270,9 @@ function Compare:Against(link, equipLoc, weights)
     end
 
     -- An off-hand item cannot go on beside a two-hander; it is up against
-    -- the two-hander itself.
-    if slots[1] == 17 then
+    -- the two-hander itself. A shield tank wants a shield there anyway, so
+    -- for it the off hand counts as empty.
+    if slots[1] == 17 and not shieldTank then
         local mainHand = Items:Equipped(16)
         local mainInfo = mainHand and Items:Info(mainHand)
         if mainInfo and mainInfo.equipLoc == "INVTYPE_2HWEAPON" then
@@ -448,6 +449,15 @@ function Compare:Judge(link)
         return result
     end
 
+    -- Judged as a spec that tanks with a one-hander and a shield
+    -- (Protection): a two-hander is not for it (no tooltip line of its own).
+    local shieldTank = Weights:ShieldTank(class, spec)
+    if shieldTank and info.equipLoc == "INVTYPE_2HWEAPON" then
+        result.verdict = "cantuse"
+        result.tankTwoHand = true
+        return result
+    end
+
     -- A weapon whose skill is not trained yet is still an upgrade, but one
     -- that can't be put on until it is (`skill`, its name). One of a type
     -- this character ignores until trained, or any while Settings hides
@@ -474,7 +484,7 @@ function Compare:Judge(link)
     local score, hit, hitValue = self:ScoreOf(link, weights)
     if not score then return nil end
 
-    local against, empty, equipped, slot, wornHit, wornValue = self:Against(link, info.equipLoc, weights)
+    local against, empty, equipped, slot, wornHit, wornValue = self:Against(link, info.equipLoc, weights, shieldTank)
     result.slot = slot
     if equipped then
         result.verdict = "equipped"
@@ -723,7 +733,7 @@ function Compare:Describe(result)
     local verdict, spec = result.verdict, result.specName
     local percent = result.percent and ("%+d%%"):format(math.floor(result.percent + 0.5)) or nil
 
-    if verdict == "cantuse" and (result.lighterArmor or result.laterArmor) then
+    if verdict == "cantuse" and (result.lighterArmor or result.laterArmor or result.tankTwoHand) then
         return nil
     elseif verdict == "cantuse" and result.ignoredSkill then
         return L.Format("Ignored until you train %s", result.ignoredSkill), "muted"

@@ -251,7 +251,7 @@ function Toast:Present(banner)
     self.frame:Show()
     -- Drops in from a little above, its gold edge flaring as it lands.
     Motion:Open(self.frame, -12)
-    if type(_G.PlaySound) == "function" then
+    if type(_G.PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
         local kit = _G.SOUNDKIT and _G.SOUNDKIT.UI_EPICLOOT_TOAST
         pcall(_G.PlaySound, kit or 31578, "Master")
     end

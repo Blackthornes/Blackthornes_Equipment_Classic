@@ -285,7 +285,7 @@ function QuestPanel:BuildStep(index)
     row:SetScript("OnMouseUp", function(self, button)
         if button ~= "LeftButton" or not self.place then return end
         if ns.QuestArrow and ns.QuestArrow:Aim(self.index) then
-            if type(_G.PlaySound) == "function" then
+            if type(_G.PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
                 pcall(_G.PlaySound, _G.SOUNDKIT and _G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
             end
         end
@@ -394,12 +394,20 @@ function QuestPanel:LayoutTabs(frame)
         for _, button in ipairs(self.tabs) do button.label:SetFont(Theme.FONT, Theme.sizes.tiny, "") end
         widths, total = Widths()
     end
+    -- Still too wide in the smaller letters (a long language): share the
+    -- room out by each name's width, and let a name wrap onto two lines.
+    if total > room then
+        for index in ipairs(widths) do widths[index] = widths[index] * room / total end
+        total = room
+    end
     local extra = math.max(0, room - total) / #self.tabs
     local x = PAD
     for index, button in ipairs(self.tabs) do
         button:ClearAllPoints()
         button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -HEADER)
         button:SetWidth(widths[index] + extra)
+        if button.label.SetWordWrap then button.label:SetWordWrap(true) end
+        button.label:SetWidth(math.max(1, widths[index] + extra - 6))
         x = x + widths[index] + extra + TAB_GAP
     end
     self.tabFont = size
@@ -459,7 +467,10 @@ function QuestPanel:OptionLines()
     if quest then
         local zoneOnly = quest:ZoneOnly()
         lines[#lines + 1] = { text = L["This Zone Only"], checked = zoneOnly,
-            run = function() quest:SetZoneOnly(not zoneOnly) end }
+            run = function()
+                quest:SetZoneOnly(not zoneOnly)
+                quest:BoxChanged("zone", not zoneOnly)
+            end }
         local swap = quest:ZoneSwap()
         lines[#lines + 1] = { text = L["Change on a New Zone"], checked = swap, disabled = not zoneOnly,
             run = function() quest:SetZoneSwap(not swap) end }
@@ -467,12 +478,21 @@ function QuestPanel:OptionLines()
     if finder then
         local solo = finder:SoloOnly()
         lines[#lines + 1] = { text = L["Solo Quests Only"], checked = solo,
-            run = function() finder:SetSoloOnly(not solo) end }
+            run = function()
+                finder:SetSoloOnly(not solo)
+                if quest then quest:BoxChanged("solo", not solo) end
+            end }
     end
     if quest then
         local stepOnly = quest:StepOnly()
         lines[#lines + 1] = { text = L["Current Step Only"], checked = stepOnly,
             run = function() quest:SetStepOnly(not stepOnly) end }
+    end
+    if quest and quest.STYLES then
+        -- How You Gear Up: one pick sets the boxes and the tab order (card D).
+        local style = quest:Style()
+        lines[#lines + 1] = { text = L["How You Gear Up:"] .. " " .. (style.label or L["Anything"]),
+            run = function() QuestPanel:OpenStyles() end }
     end
     if finder then
         lines[#lines + 1] = { text = L["Quest Level:"] .. " " .. QuestPanel.QuestLevelsText(QuestPanel.QuestLevelsValue()),
@@ -502,6 +522,30 @@ function QuestPanel:LevelLines()
             run = function() finder:SetQuestLevelsAbove(value) end }
     end
     return lines
+end
+
+--- How You Gear Up's choices, the one picked ticked, then what it sets.
+function QuestPanel:StyleLines()
+    local quest = ns.UpgradeQuest
+    if not (quest and quest.STYLES) then return {} end
+    local now = quest:Style()
+    local lines = {}
+    for _, style in ipairs(quest.STYLES) do
+        lines[#lines + 1] = { text = style.label, checked = style.key == now.key,
+            run = function() quest:SetStyle(style.key) end }
+    end
+    local sets = quest.StyleLines(now)
+    if sets and #sets > 0 then
+        lines[#lines + 1] = { text = L["This sets:"], disabled = true }
+        for _, line in ipairs(sets) do lines[#lines + 1] = { text = "  " .. line, disabled = true } end
+    end
+    return lines
+end
+
+function QuestPanel:OpenStyles()
+    if not ns.RowMenu then return end
+    local function Open() ns.RowMenu:Open(QuestPanel:StyleLines(), { title = L["How You Gear Up:"] }) end
+    if C_Timer and C_Timer.After then C_Timer.After(0, Open) else Open() end
 end
 
 function QuestPanel:OpenLevels()
@@ -767,6 +811,7 @@ function QuestPanel:Build()
     local gain = Theme.CreateLabel(item, "tiny", "good")
     gain:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
     gain:SetWidth(WIDTH - PAD * 2 - ICON - 12)
+    if gain.SetWordWrap then gain:SetWordWrap(true) end
     self.gain = gain
 
     -- How far along: gold filling to green.
@@ -953,6 +998,8 @@ function QuestPanel:Refresh()
 
     local logic = ns.UpgradeQuest
     self:FillTabs()
+    -- How many filters are on, on the Options button (card B).
+    if ns.QuestPanelMore then ns.QuestPanelMore:FillOptions(self) end
 
     -- The Quest log tab: its own list in place of the quest's.
     if self:ShowsLog() and ns.QuestLogUI and ns.QuestLogUI.view then
@@ -1040,7 +1087,7 @@ function QuestPanel:FillBody(quest, steps, current, done)
         local text
         if state == "waiting" then
             text = L["Looking for your next upgrade..."]
-        elseif ns.UpgradeQuest:ZoneOnly() then
+        elseif ns.UpgradeQuest:KeepsToZone() then
             text = L.Format("%s Only this zone is searched. Untick This zone only to look everywhere, or try another tab.",
                 ns.UpgradeQuest.NONE[ns.UpgradeQuest:Tab()] or L["No upgrade to chase right now."])
         else
@@ -1057,12 +1104,24 @@ function QuestPanel:FillBody(quest, steps, current, done)
         self.otherButton:SetText(L["Pick one"])
         self.otherButton:Show()
         local height = y + 22 + PAD
+        local more = ns.QuestPanelMore
+        if more then
+            more:HideQuestParts(self)
+            local foot = more:FillFoot(self, y + 22 + 6)
+            if foot > 0 then height = y + 22 + 6 + foot + 4 end
+        end
         self.body:SetHeight(height)
         return height
     end
 
     self.empty:Hide()
-    local top = PAD + self:FillOffer(ns.UpgradeQuest:Offer())
+    local more = ns.QuestPanelMore
+    local top = PAD
+    -- Your gear's rating sits over everything else (card I).
+    if more then top = top + more:FillGear(self, top) end
+    self.offerBox:ClearAllPoints()
+    self.offerBox:SetPoint("TOPLEFT", PAD, -top)
+    top = top + self:FillOffer(ns.UpgradeQuest:Offer())
     self.item:ClearAllPoints()
     self.item:SetPoint("TOPLEFT", PAD, -top)
     self.item:Show()
@@ -1071,7 +1130,7 @@ function QuestPanel:FillBody(quest, steps, current, done)
     local textWidth = WIDTH - PAD * 2 - ICON - 12
     local source = quest.source
     if source and source.kind == "craft" and ns.TradeskillsQueue and ns.TradeskillsQueue:Available() then
-        self.queueButton:SetText(ns.TradeskillsQueue:Label(quest.itemID or source.itemID))
+        self.queueButton:SetText(ns.TradeskillsQueue:Label(quest.itemID or source.itemID, source))
         self.queueButton:Show()
         -- The button grows to fit its words (German runs longer).
         local okWidth, queueWidth = pcall(self.queueButton.GetWidth, self.queueButton)
@@ -1085,17 +1144,29 @@ function QuestPanel:FillBody(quest, steps, current, done)
     -- In its rarity colour, even for a quest saved before the client sent it.
     local shown = ns.Items.ShowLink(quest.link) or "?"
     self.name:SetText(shown)
-    local nameLines = math.min(2, QuestPanel.Lines("normal", shown, textWidth))
-    self.gain:SetText(QuestPanel.GainText(quest))
-    local itemHeight = math.max(ICON, 4 + nameLines * LINE_HEIGHT.normal + 3 + LINE_HEIGHT.tiny)
+    local nameLines = math.max(1, QuestPanel.Lines("normal", shown, textWidth))
+    local gainText = QuestPanel.GainText(quest)
+    self.gain:SetText(gainText)
+    local gainLines = math.max(1, QuestPanel.Lines("tiny", gainText or "", textWidth))
+    local itemHeight = math.max(ICON, 4 + nameLines * LINE_HEIGHT.normal + 3 + gainLines * LINE_HEIGHT.tiny)
+    -- Why this one was picked, under the gain (card A).
+    if more then itemHeight = math.max(ICON, itemHeight + more:FillWhy(self, quest, textWidth)) end
     self.item:SetHeight(itemHeight)
 
+    -- Two more picks worth a look, folded under the item (card E).
+    local y = top + itemHeight + 8
+    if more then y = y + more:FillAlso(self, quest, y) end
+
+    self.track:ClearAllPoints()
+    self.track:SetPoint("TOPLEFT", self.body, "TOPLEFT", PAD, -y)
     self.track:Show()
     self.fill:Show()
     local share = #steps > 0 and done / #steps or 0
     self.fill:SetWidth(math.max(1, (WIDTH - PAD * 2) * share))
 
-    local y = top + itemHeight + 8 + BAR + 10
+    y = y + BAR + 10
+    -- What this pick asks of you, as chips (card C).
+    if more then y = y + more:FillChips(self, quest, y) end
     -- "Current step only": just the step to do now, the panel shrinking to
     -- fit. With none left to do, the last step stands in.
     local only = ns.UpgradeQuest:StepOnly() and (steps[current] and current or #steps) or nil
@@ -1141,6 +1212,9 @@ function QuestPanel:FillBody(quest, steps, current, done)
     end
 
     local height = y + FOOTER - 4
+    -- Ignored and done counts along the foot (card G).
+    local foot = more and more:FillFoot(self, y + 22 + 6) or 0
+    if foot > 0 then height = y + 22 + 6 + foot + 4 end
     self.body:SetHeight(height)
     return height
 end
@@ -1197,7 +1271,7 @@ function QuestPanel:Cheer()
     Motion:Run(self.frame, "cheer", 0.9, function(p)
         Theme.SetHalo(self.frame, 0.6 + (rest - 0.6) * p, p < 1 and "good" or "accent")
     end)
-    if type(_G.PlaySound) == "function" then
+    if type(_G.PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
         local kit = _G.SOUNDKIT and _G.SOUNDKIT.UI_QUEST_OBJECTIVE_COMPLETE
         pcall(_G.PlaySound, kit or 6197, "Master")
     end

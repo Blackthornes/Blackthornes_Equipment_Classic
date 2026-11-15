@@ -139,10 +139,17 @@ env.bags[0][1] = nil
 env.worn[5] = "item:1002"
 Quest:Update()
 suite.check("worn, the quest is complete", Quest:DoneCount() == 1)
-suite.check("with a banner", (function()
+suite.check("with Upgrade Done!", (function()
+    local done = ns.UpgradeDone
+    if ns.Motion and ns.Motion.Step then ns.Motion:Step(2) end
+    return done and done.frame and done.frame:IsShown()
+        and done.plaque and done.count:GetText() == "Done: 1"
+end)(), ns.UpgradeDone and ns.UpgradeDone.count and ns.UpgradeDone.count:GetText())
+suite.check("and no second banner", (function()
     for _, banner in ipairs(toasts) do
-        if banner.title == "Upgrade quest complete" then return true end
+        if banner.title == "Upgrade quest complete" then return false end
     end
+    return true
 end)())
 -- Nothing on offer beats what is worn now.
 suite.check("and nothing left to chase", Quest:Current() == nil and Quest.state == "none", Quest.state)
@@ -228,6 +235,48 @@ env.worn[5] = "item:9000"
 Quest:Update()
 suite.check("beaten in the bags, it is dropped too", Quest:Current() == nil or Quest:Current().itemID ~= beaten.itemID)
 env.bags[0][1] = nil
+env.worn[5] = "item:900"
+
+-- Let go, and not picked straight back. The game, asked now, says the
+-- quest's upgrade is none, while the finder's kept verdicts still list it
+-- (gear, level and settings stand still). It used to be picked again and let
+-- go again, a whole scan each time, for as long as the panel was up.
+Reset()
+ns.Finder:MarkStale()
+Quest:Update()
+local loop = Quest:Current()
+suite.check("a quest to let go", loop ~= nil)
+local realWanted = Quest.StillWanted
+Quest.StillWanted = function(self, quest)
+    if quest and loop and quest.itemID == loop.itemID then return false end
+    return realWanted(self, quest)
+end
+local function Beaten()
+    local count = 0
+    for _, banner in ipairs(toasts) do
+        if banner.title == "You already beat this one" then count = count + 1 end
+    end
+    return count
+end
+local bannersBefore = Beaten()
+Quest:Update()
+local changesAfter = ns.Finder.changes
+for _ = 1, 6 do Quest:Update() end
+local back = Quest:Current()
+suite.check("let go, it is not picked straight back", back == nil or back.itemID ~= loop.itemID,
+    back and back.itemID)
+suite.check("and nothing marks the finder stale again", ns.Finder.changes == changesAfter,
+    tostring(ns.Finder.changes) .. " " .. tostring(changesAfter))
+suite.check("and it is said once", Beaten() == bannersBefore + 1, Beaten() - bannersBefore)
+suite.check("so the last scan stays the newest", ns.Finder.stale == false)
+-- Gear moves (the finder's own key with it): it can be picked again.
+Quest.StillWanted = realWanted
+env.worn[5] = "item:1003"
+Reset()
+ns.Finder:MarkStale()
+Quest:Update()
+suite.check("once gear moves it can be picked again", Quest.letGo[loop.itemID] == nil
+    and Quest:Current() ~= nil, Quest:Current() and Quest:Current().itemID)
 env.worn[5] = "item:900"
 
 --------------------------------------------------------------------------------
@@ -618,9 +667,14 @@ for _, tab in ipairs(Quest.TABS) do
     if not Quest:Quests()[tab.key] and Quest.states[tab.key] == "none" then emptyNone = emptyNone + 1 end
 end
 suite.check("some tab has nothing to chase", emptyNone > 0, emptyNone)
--- Each event also reaches the finder, which marks its last scan out of date.
+-- Each event also reaches the finder, which marks its last scan out of date
+-- (a bag change only when gear it could list came or went).
 local function Event(name)
-    if name ~= "QUEST_LOG_UPDATE" and name ~= "ZONE_CHANGED_NEW_AREA" then ns.Finder:MarkStale() end
+    if name == "BAG_UPDATE_DELAYED" then
+        ns.Finder:OnBags()
+    elseif name ~= "QUEST_LOG_UPDATE" and name ~= "ZONE_CHANGED_NEW_AREA" then
+        ns.Finder:MarkStale()
+    end
     Quest:OnEvent(name)
 end
 local realBuild, scans = ns.Finder.Build, 0
@@ -628,14 +682,16 @@ ns.Finder.Build = function(...) scans = scans + 1 return realBuild(...) end
 for _ = 1, 20 do
     Event("BAG_UPDATE_DELAYED")
     Event("QUEST_LOG_UPDATE")
-    Event("ZONE_CHANGED_NEW_AREA")
 end
 suite.check("twenty loots and quest log ticks scan nothing", scans == 0, scans)
 clock = clock + 61
 Event("BAG_UPDATE_DELAYED")
-suite.check("a bag change a minute later looks once", scans == 1, scans)
+suite.check("a bag change with no new gear looks at nothing, even a minute later", scans == 0, scans)
+clock = clock + 600
 Event("BAG_UPDATE_DELAYED")
-suite.check("and not again straight after", scans == 1, scans)
+suite.check("nor ten minutes later", scans == 0, scans)
+Event("ZONE_CHANGED_NEW_AREA")
+suite.check("a new zone looks again", scans == 1, scans)
 Event("PLAYER_EQUIPMENT_CHANGED")
 suite.check("new gear worn looks again", scans == 2, scans)
 ns.Finder.Build = realBuild

@@ -72,6 +72,15 @@ local function Read(item, bag, slot)
         advice.upgrade = (Compare.WearableUpgrade(result) and not result.skill) and "now" or "later"
         advice.gain = Gain(result)
     end
+    -- No way this class ever wears it: gear for other classes, an armor or
+    -- weapon kind it never learns. Not mail or plate learned later, Best
+    -- Armor Only, a hidden untrained weapon or a two-hander while judged as
+    -- Protection, which are only for now.
+    if type(result) == "table" and result.verdict == "cantuse" and not result.laterArmor
+        and not result.lighterArmor and not result.ignoredSkill
+        and not result.tankTwoHand then
+        advice.never = true
+    end
     if not tool then
         advice.sell = BagIcons:Sells(bag, slot, link, result) == true
         -- No use to the character playing: is it an upgrade for another?
@@ -94,6 +103,8 @@ end
 --            (Weights:KindTooFar), and goes to an alt only on the same terms
 --   gain     the upgrade's size as a whole percent, or nil
 --   sell     true when the bag's sell coin would show on it
+--   never    true when this class can never wear it (other classes only,
+--            or an armor or weapon kind it never learns)
 --   tool     true for gathering and profession tools and fishing poles,
 --            kept to use and never sold
 --   alt      when it is no upgrade here but is for another of the player's

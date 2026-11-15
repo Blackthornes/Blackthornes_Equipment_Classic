@@ -77,3 +77,23 @@ Brought over one at a time since:
 - `db40457` The upgrade banner can be dragged and keeps its spot per
   character, right-click puts it back (2026-11-07, the owner said yes; as it
   is, with its six-language hover line).
+- Weekly check of 2026-11-14 (the owner said do them all, 2026-11-15):
+  `0410c9e` and `cca5fc1` Mute All Sounds and window spots
+  (`UI/SharedWindow.lua` FILE_VERSION 9 and `UI/WhatsNew.lua` FILE_VERSION
+  7, the same in all five Classic repos; the window test uses Era's
+  `AuctionFrame`), `2638eef` Queue It on a later pattern (needs
+  Tradeskills' `af0f9af`), and the fixes `0252e00`, `39a97ee`, `02a0b14`,
+  `3ffd3da`, `f83b893`, `b49f9dc`, `9e8c4b9`, `5516776`, `7fa5228`,
+  `e9d2298`, `121d28b`, `e6f59e1`, `ae7ab5e`, `d71177a` and `890e67e`.
+  Kept Classic's own: the talent events (`CHARACTER_POINTS_CHANGED`,
+  `PLAYER_TALENT_UPDATE`) wherever Forever lists only
+  `TRAIT_CONFIG_UPDATED`, and the healers' weapon damage and armor weights
+  (only their spell power halved, see "Healers' spell power" in
+  `docs/CLASSIC_DIFFERENCES.md`). Left out for now: set bonuses
+  (`72f72d7` and what follows, `ReplacedSlots` and `WithSets` in
+  `Compare.lua`) and "its giver no longer offers it" (`NotOffered`).
+  The upgrade quest panel redesign came after the mockup (the owner said
+  build it, 2026-11-15): `215bfc8`, `53d4d5d`, `323d0c1`, `2b4c6b5`,
+  `911fd57`, `01e2083`, `c024185`, `4b2b0b0` and `6955d86`. The map marker
+  clicks went on Era's own Show on map pin (`Waypoints.marked`), since
+  Classic has no `MapPins:Spotlight`.

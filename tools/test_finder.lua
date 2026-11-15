@@ -222,6 +222,7 @@ local asked = {}
 local cached = { [1003] = false }
 C_Item.IsItemDataCachedByID = function(id) if cached[id] == false then return false end return true end
 C_Item.RequestLoadItemDataByID = function(id) asked[#asked + 1] = id end
+Finder.judged = nil   -- as if never judged before
 local waiting = Finder:Scan()
 suite.check("an item the client has not seen is waited on", waiting.waiting == 1, waiting.waiting)
 suite.check("and asked about", asked[1] == 1003)
@@ -234,7 +235,16 @@ suite.check("once it arrives it is offered", Offered(Finder:Scan(), 5) == "1003,
 asked = {}
 Finder.tries = nil
 cached[1003] = false
-for _ = 1, 6 do Finder:Scan() end
+-- Each scan comes well after the last: an item asked a moment ago is not
+-- asked again until its answer has had time to come.
+local realNow, clock = Finder.Now, os.time()
+Finder.Now = function() return clock end
+for _ = 1, 6 do
+    clock = clock + 60
+    Finder.judged = nil
+    Finder:Scan()
+end
+Finder.Now = realNow
 local times = 0
 for _, id in ipairs(asked) do if id == 1003 then times = times + 1 end end
 suite.check("an item that never arrives is asked three times at most", times == 3, times)
@@ -243,6 +253,7 @@ suite.check("an item that never arrives is asked three times at most", times == 
 -- choices wait on the same queue.
 asked = {}
 cached[1005] = false
+Finder.judged = nil
 QuestFrame = { IsShown = function() return true end }
 Finder:Scan()
 suite.check("nothing is asked while the quest window is open", #asked == 0, #asked)
@@ -380,8 +391,10 @@ do
     suite.check("an item nobody here asked for rescans nothing", builds == 0, builds)
     ns.Finder.asked[1003] = true
     Fire("GET_ITEM_INFO_RECEIVED", 1003, true)
-    suite.check("one the finder asked for rescans", builds >= 1, builds)
+    ns.Finder:AnswersSettled()
+    suite.check("one the finder asked for rescans once the answers settle", builds >= 1, builds)
     builds, paused = 0, 0
+    ns.Finder.carriedSeen = nil
     Fire("BAG_UPDATE_DELAYED")
     suite.check("a bag change rescans a slice at a time", builds >= 1 and paused == builds, paused .. "/" .. builds)
     builds = 0

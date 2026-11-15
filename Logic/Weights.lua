@@ -141,6 +141,9 @@ local SPECS = {
         },
         prot = {
             name = "Protection",
+            -- Tanks with a one-hander and a shield: a two-hander is never
+            -- an upgrade while judged as this spec (Compare:Judge).
+            shieldTank = true,
             weights = {
                 stamina = 1.0, strength = 0.6, agility = 0.6, armor = 0.1,
                 defense = 1.2, dodge = 12, parry = 10, block = 6, blockValue = 0.4,
@@ -159,7 +162,7 @@ local SPECS = {
         holy = {
             name = "Holy",
             weights = {
-                intellect = 1.0, healing = 0.8, spellPower = 0.9, spirit = 0.5,
+                intellect = 1.0, healing = 0.8, spellPower = 0.45, spirit = 0.5,
                 stamina = 0.3, mp5 = 2, spellCrit = 10, armor = 0.005,
                 holyDamage = 0.3,
                 meleeDps = 0.3,
@@ -167,6 +170,8 @@ local SPECS = {
         },
         prot = {
             name = "Protection",
+            -- Tanks with a one-hander and a shield, as Protection warriors do.
+            shieldTank = true,
             weights = {
                 stamina = 1.0, strength = 0.5, agility = 0.4, intellect = 0.3,
                 armor = 0.08, defense = 1.0, dodge = 10, parry = 8, block = 6,
@@ -236,7 +241,7 @@ local SPECS = {
             name = "Holy",
             weights = {
                 intellect = 1.0, spirit = 0.9, stamina = 0.3, healing = 1.0,
-                spellPower = 0.8, mp5 = 2.5, spellCrit = 10, rangedDps = 2,
+                spellPower = 0.4, mp5 = 2.5, spellCrit = 10, rangedDps = 2,
                 holyDamage = 0.3, shadowDamage = 0.2,
                 meleeDps = 0.3,
                 armor = 0.01,
@@ -280,7 +285,7 @@ local SPECS = {
             name = "Restoration",
             weights = {
                 intellect = 1.0, spirit = 0.3, stamina = 0.4, healing = 1.0,
-                spellPower = 0.8, mp5 = 3, spellCrit = 10,
+                spellPower = 0.4, mp5 = 3, spellCrit = 10,
                 meleeDps = 0.3,
                 armor = 0.01,
             },
@@ -412,7 +417,7 @@ local SPECS = {
             name = "Restoration",
             weights = {
                 intellect = 1.0, spirit = 0.8, stamina = 0.4, healing = 1.0,
-                spellPower = 0.8, mp5 = 2.5, spellCrit = 8,
+                spellPower = 0.4, mp5 = 2.5, spellCrit = 8,
                 meleeDps = 0.3,
                 armor = 0.01,
             },
@@ -766,6 +771,47 @@ function Weights:ForgetPoints()
     pointsRead = nil
 end
 
+--- The talents the character has bought, as one string: the same string
+--- means the talents are as they were. The client says TRAIT_CONFIG_UPDATED
+--- for any trait tree, not only the class's talents, and each one used to
+--- throw every upgrade verdict away and start a new scan. nil when the
+--- talents can't be read, so nothing is held back.
+function Weights:TalentSignature()
+    local talents = type(C_ClassTalents) == "table" and C_ClassTalents
+    local traits = type(C_Traits) == "table" and C_Traits
+    if talents and traits and type(talents.GetActiveConfigID) == "function"
+        and type(traits.GetConfigInfo) == "function"
+        and type(traits.GetTreeNodes) == "function"
+        and type(traits.GetNodeInfo) == "function" then
+        local ok, configID = pcall(talents.GetActiveConfigID)
+        if not ok or not configID then return nil end
+        local okInfo, info = pcall(traits.GetConfigInfo, configID)
+        if not okInfo or type(info) ~= "table" or type(info.treeIDs) ~= "table" then return nil end
+
+        local parts = {}
+        for _, treeID in ipairs(info.treeIDs) do
+            local okNodes, nodes = pcall(traits.GetTreeNodes, treeID)
+            if not okNodes or type(nodes) ~= "table" then return nil end
+            for _, nodeID in ipairs(nodes) do
+                local okNode, node = pcall(traits.GetNodeInfo, configID, nodeID)
+                if not okNode or type(node) ~= "table" then return nil end
+                local ranks = tonumber(node.ranksPurchased) or 0
+                if ranks > 0 then
+                    local entry = type(node.activeEntry) == "table" and node.activeEntry.entryID
+                    parts[#parts + 1] = tostring(nodeID) .. "=" .. ranks .. ":" .. tostring(entry or "")
+                end
+            end
+        end
+        table.sort(parts)
+        return "c" .. tostring(configID) .. ";" .. table.concat(parts, ";")
+    end
+
+    -- A client with the old talent tabs: the points in each.
+    local points = self:TreePoints(self:PlayerClass())
+    if type(points) ~= "table" then return nil end
+    return "t" .. table.concat(points, ",")
+end
+
 function Weights:OnEnable()
     for _, event in ipairs({ "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE", "CHARACTER_POINTS_CHANGED",
         "PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD" }) do
@@ -802,6 +848,15 @@ function Weights:CurrentSpec()
     end
 
     return specs.default, "default", class
+end
+
+--- True for a spec that tanks with a one-hander and a shield (Protection
+--- warriors and paladins), so a two-hander is never an upgrade for it.
+--- Bear Tank druids can't use shields and are not one.
+function Weights:ShieldTank(class, spec)
+    local specs = class and SPECS[class]
+    local entry = specs and spec and specs[spec]
+    return type(entry) == "table" and entry.shieldTank == true
 end
 
 -- Each merged table's weapon kind numbers, kept beside it rather than in it,
@@ -1428,18 +1483,47 @@ end
 --- Convert what GetItemStats returned into the names above. Keys this addon
 --- does not know are returned separately so the probe can show them.
 --- Ratings come back as the percent they give.
+--- Caster power is two totals (2026-11-12, a player's report): spellPower
+--- is what it adds to damage, healing what it adds to healing. Gear with
+--- "damage and healing" (ITEM_MOD_SPELL_POWER_SHORT) counts in both, and a
+--- damage or healing line on its own is read as that whole total, so gear
+--- that sends power and healing together is never counted twice.
+local CASTER_POWER = {
+    ITEM_MOD_SPELL_POWER_SHORT = "both",
+    ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "spellPower",
+    ITEM_MOD_SPELL_HEALING_DONE_SHORT = "healing",
+}
+Weights.CASTER_POWER = CASTER_POWER
+
+local function AddCasterPower(stats, power)
+    local both = power.both or 0
+    local damage = math.max(both, power.spellPower or 0)
+    local healing = math.max(both, power.healing or 0)
+    if damage > 0 then stats.spellPower = (stats.spellPower or 0) + damage end
+    if healing > 0 then stats.healing = (stats.healing or 0) + healing end
+end
+
 function Weights:Normalize(clientStats)
-    local stats, unknown = {}, {}
+    local stats, unknown, power = {}, {}, nil
     for key, value in pairs(clientStats or {}) do
         local rating = RATINGS[key]
+        if CASTER_POWER[key] and type(value) == "number" then
+            power = power or {}
+            local part = CASTER_POWER[key]
+            power[part] = (power[part] or 0) + value
+            rating = false
+        end
         local name = rating and rating.stat or STAT_KEYS[key] or SchoolKey(key)
-        if name and type(value) == "number" then
+        if rating == false then
+            -- caster power, added once the whole item is read
+        elseif name and type(value) == "number" then
             if rating then value = value / self:RatingPer(rating) end
             stats[name] = (stats[name] or 0) + value
         else
             unknown[#unknown + 1] = key
         end
     end
+    if power then AddCasterPower(stats, power) end
     table.sort(unknown)
     return stats, unknown
 end

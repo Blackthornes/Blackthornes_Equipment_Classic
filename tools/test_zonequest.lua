@@ -330,4 +330,63 @@ suite.check("folded, the quest hides", Panel.folded and not Panel.body:IsShown()
 Panel:ToggleFold()
 suite.check("unfolded, it is back", not Panel.folded and Panel.body:IsShown())
 
+--------------------------------------------------------------------------------
+-- The window's filters (a player's report, 2026-11-13: Where to get
+-- upgrades kept to the zone, the upgrade quest did not)
+--------------------------------------------------------------------------------
+
+Quest:SetZoneOnly(false)
+zone = "Elwynn Forest"
+Quest:OnEvent("ZONE_CHANGED_NEW_AREA")
+suite.check("both zone boxes off, the tabs pick anywhere", On("vendor") == 1002 and On("quest") == 1004,
+    tostring(On("vendor")) .. "," .. tostring(On("quest")))
+ns.FinderUI:SetZoneOnly(true)
+suite.check("the window's This Zone Only keeps the quest to this zone", Quest:KeepsToZone()
+    and not Quest:ZoneOnly() and On("vendor") == 1001 and On("quest") == 1003,
+    tostring(On("vendor")) .. "," .. tostring(On("quest")))
+zone = "Westfall"
+Quest:OnEvent("ZONE_CHANGED_NEW_AREA")
+suite.check("and a new zone picks there", On("vendor") == 1002 and On("quest") == 1004,
+    tostring(On("vendor")) .. "," .. tostring(On("quest")))
+zone = "Elwynn Forest"
+Quest:OnEvent("ZONE_CHANGED_NEW_AREA")
+ns.FinderUI:SetZoneOnly(false)
+suite.check("unticked, the tabs pick anywhere again", On("vendor") == 1002 and On("quest") == 1004,
+    tostring(On("vendor")) .. "," .. tostring(On("quest")))
+suite.check("the panel's box alone still keeps to the zone", (function()
+    Quest:SetZoneOnly(true)
+    local ok = On("vendor") == 1001
+    Quest:SetZoneOnly(false)
+    return ok
+end)())
+
+ns.FinderUI:SetSource("vendor", false)
+suite.check("an unticked source box empties that tab", On("vendor") == nil, On("vendor"))
+suite.check("and leaves the others", On("quest") == 1004, On("quest"))
+ns.FinderUI:SetSource("vendor", true)
+suite.check("ticked again, the tab picks again", On("vendor") == 1002, On("vendor"))
+
+local learn = { kind = "craft", state = "learn" }
+suite.check("Only what I can get now lets known crafts through", (function()
+    ns.db.finderGetNow = true
+    local ok = Quest.WindowAllows({ kind = "craft", state = "known" })
+        and Quest.WindowAllows({ kind = "craft", state = "alt" })
+        and not Quest.WindowAllows(learn)
+        and not Quest.WindowAllows({ kind = "vendor" }, { needs = { faction = "x" } })
+    ns.db.finderGetNow = false
+    return ok and Quest.WindowAllows(learn)
+end)())
+suite.check("an unticked Raids box leaves raid drops out", (function()
+    ns.db.finderSourcesOff = { raid = true }
+    local ok = not Quest.WindowAllows({ kind = "dungeon", raid = true })
+        and Quest.WindowAllows({ kind = "dungeon" })
+    ns.db.finderSourcesOff = nil
+    return ok
+end)())
+
+Quest:QuestOn("vendor").followed = true
+ns.FinderUI:SetSource("vendor", false)
+suite.check("a quest followed from the window stays", On("vendor") == 1002, On("vendor"))
+ns.FinderUI:SetSource("vendor", true)
+
 suite.done()

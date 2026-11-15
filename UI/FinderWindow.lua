@@ -1532,6 +1532,14 @@ function FinderUI:SetGetNowOnly(on)
     if self.getNow then self.getNow:SetChecked(ns.db.finderGetNow) end
     self.offset = 0
     self:Redraw()
+    self.TellQuest()
+end
+
+--- The upgrade quest picks only what this window's filters let through,
+--- so it hears when one changes.
+function FinderUI.TellQuest()
+    local quest = ns.UpgradeQuest
+    if quest and quest.WindowFiltersChanged then pcall(quest.WindowFiltersChanged, quest) end
 end
 
 --- Can this source be used now? Not for gear that waits on a reputation
@@ -1565,6 +1573,7 @@ function FinderUI:SetSource(kind, on)
     end
     self.offset = 0
     self:Redraw()
+    self.TellQuest()
 end
 
 --- Draw again from the last scan, for a change that needs no new look (a
@@ -1590,6 +1599,7 @@ function FinderUI:SetZoneOnly(on)
     if self.zone then self.zone:SetChecked(ns.db.finderZoneOnly) end
     self.offset = 0
     self:Refresh()
+    self.TellQuest()
 end
 
 --- The zone the list keeps to, or nil for anywhere.
@@ -2050,7 +2060,7 @@ function FinderUI:FillRow(row, line)
         and ns.TradeskillsQueue.CraftSource(line.sources) or nil
     row.queueIt.source = craft
     if craft then
-        row.queueIt:SetText(ns.TradeskillsQueue:Label(craft.itemID))
+        row.queueIt:SetText(ns.TradeskillsQueue:Label(craft.itemID, craft))
         row.queueIt:Show()
     else
         row.queueIt:Hide()
@@ -2589,7 +2599,7 @@ end
 
 local EVENTS = {
     "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP",
-    "QUEST_TURNED_IN", "TRAIT_CONFIG_UPDATED", "BAG_UPDATE_DELAYED",
+    "QUEST_TURNED_IN", "TRAIT_CONFIG_UPDATED",
     "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE",
 }
 
@@ -2599,8 +2609,27 @@ function FinderUI:OnEnable()
     end
     -- Only answers the finder asked for: the client loads items for chat
     -- links, the auction house and other addons all the time.
-    ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
-        if Finder:Asked(itemID) then FinderUI:RefreshSoon() end
+    -- They come in bursts. While the window is up the finder keeps asking
+    -- for the rest a batch at a time, and the window scans again only once
+    -- they are all in (or a real change let one more scan follow).
+    if type(Finder.WatchAnswers) == "function" then
+        Finder.keepAsking = function()
+            return FinderUI.frame ~= nil and FinderUI.frame:IsShown() and true or false
+        end
+        Finder:WatchAnswers(function(again, done)
+            if again or done then FinderUI:RefreshSoon() end
+        end)
+    else
+        ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
+            if Finder:Asked(itemID) then FinderUI:RefreshSoon() end
+        end)
+    end
+    -- A stack growing or shrinking changes no upgrade; gear coming or going
+    -- does.
+    ns.RegisterEvent(self, "BAG_UPDATE_DELAYED", function()
+        if type(Finder.CarriedMoved) ~= "function" or Finder:CarriedMoved("finderUI") then
+            FinderUI:RefreshSoon()
+        end
     end)
     -- A new zone has its own list while "This zone only" is ticked, and
     -- always its own green zone names and nearest-first order.

@@ -57,6 +57,19 @@ suite.check("but the other character it helps", advice.alt and advice.alt.key ==
 suite.check("and no sell coin while another wants it", advice.sell == false)
 suite.check("the gear in the bags shows no upgrade", next(Compare:BestInBags()) == nil)
 
+-- A soulbound copy can't be mailed to the other character, so it sells.
+local BagIcons = ns.BagIcons
+suite.check("no coin on a copy the other character can have", BagIcons:Sells(0, 6, "item:6", result) == false)
+_G.C_Container.GetContainerItemInfo = function(bag, slot)
+    if bag ~= 0 then return nil end
+    return { quality = 1, isBound = true, stackCount = 1 }
+end
+suite.check("a soulbound copy gets the sell coin", BagIcons:Sells(0, 6, "item:6", result) == true)
+_G.C_Container.GetContainerItemInfo = function(bag, slot)
+    if bag ~= 0 then return nil end
+    return { quality = 1, isBound = false, stackCount = 1 }
+end
+
 -- Inside a dungeon the GUID can be kept back: the character's own copy answers.
 guid = nil
 suite.check("still skipped when the GUID can't be read", Alts:PlayerSkipped() == true)

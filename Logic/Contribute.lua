@@ -562,7 +562,7 @@ end
 --- A sound and a line across the screen as the chat line goes out. Only a
 --- receiving character ever gets here.
 function Contribute:Alert(line)
-    if type(PlaySound) == "function" then
+    if type(PlaySound) == "function" and not (ns.Muted and ns.Muted()) then
         local kits = type(_G.SOUNDKIT) == "table" and _G.SOUNDKIT or {}
         pcall(PlaySound, kits.IG_QUEST_LIST_COMPLETE or 878)
     end

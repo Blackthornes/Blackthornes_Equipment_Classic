@@ -66,15 +66,24 @@ local queue = {
     Ensure = function(_, recipeID, quantity)
         if not recipeKnown then return nil, "not seen yet" end
         crafts[recipeID] = quantity
+        -- Tradeskills drops the materials it listed for this recipe.
+        for i = #buys, 1, -1 do
+            local fr = buys[i].forRecipe
+            if fr and fr.recipeID == recipeID then table.remove(buys, i) end
+        end
         return true
     end,
-    EnsureBuy = function(_, itemID, count, forItem)
-        buys[#buys + 1] = { itemID = itemID, count = count, forItem = forItem }
+    EnsureBuy = function(_, itemID, count, forItem, forRecipe)
+        buys[#buys + 1] = { itemID = itemID, count = count, forItem = forItem, forRecipe = forRecipe }
         return true
     end,
-    ForUpgrade = function(_, itemID)
-        for _, line in ipairs(buys) do if line.forItem == itemID then return "buy" end end
+    ForUpgrade = function(_, itemID, recipeID)
+        for _, line in ipairs(buys) do
+            if line.forItem == itemID then return "buy" end
+            if recipeID and line.forRecipe and line.forRecipe.recipeID == recipeID then return "buy" end
+        end
         if itemID == 3001 and crafts[9001] then return "craft" end
+        if itemID == 3002 and crafts[9002] then return "craft" end
         return nil
     end,
     ShowQueue = function() opened = opened + 1; return true end,
@@ -93,6 +102,22 @@ suite.check("a click on Queued opens the Queue tab", opened == 1)
 TSQ:Queue(learn)
 suite.check("a recipe to learn puts its materials on the list",
     #buys == 1 and buys[1].itemID == 2318 and buys[1].count == 6 and buys[1].forItem == 3002)
+local fr = buys[1] and buys[1].forRecipe
+suite.check("tied to the recipe, so learning it queues one craft",
+    type(fr) == "table" and fr.recipeID == 9002 and fr.crafts == 1, fr and tostring(fr.recipeID))
+suite.check("and reads Queued while the recipe is still to learn", TSQ:Label(3002, learn) == "Queued")
+
+-- Learned since: the button offers the craft again and a click queues it.
+_G.IsPlayerSpell = function(id) return id == 9001 or id == 9002 end
+ns.Crafting:Forget()
+suite.check("once learned it reads Queue It again", TSQ:Label(3002, learn) == "Queue It")
+local openedBefore = opened
+TSQ:Queue(learn)
+suite.check("and a click queues the craft, not the Queue tab", crafts[9002] == 1 and opened == openedBefore)
+suite.check("then reads Queued", TSQ:Label(3002, learn) == "Queued")
+crafts[9002] = nil
+_G.IsPlayerSpell = function(id) return id == 9001 end
+ns.Crafting:Forget()
 
 buys = {}
 TSQ:Queue(other)

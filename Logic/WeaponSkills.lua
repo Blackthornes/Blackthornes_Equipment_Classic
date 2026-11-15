@@ -63,21 +63,62 @@ function WeaponSkills:Known()
     return self.kept or nil
 end
 
---- Forget the kept answer: a skill may have been learned.
+--- The known weapon skills as one string, for telling a real change from
+--- the many events that change nothing.
+local function Signature(known)
+    if not known then return "" end
+    local ids = {}
+    for subclassID in pairs(known) do ids[#ids + 1] = tonumber(subclassID) or 0 end
+    table.sort(ids)
+    return table.concat(ids, ",")
+end
+WeaponSkills.Signature = Signature
+
+-- How long a burst of spell and skill events gets before one look.
+WeaponSkills.SETTLE = 1
+
+--- Forget the kept answer: a skill may have been learned. SPELLS_CHANGED
+--- and SKILL_LINES_CHANGED come all the time (every weapon skill point in a
+--- fight), so this only looks once the burst settles, and the finder judges
+--- again only when the known skills really changed.
 function WeaponSkills:Forget()
     self.kept = nil
-    -- The finder keeps its verdicts, and a weapon's "Train" mark or an
-    -- ignored type's "cantuse" is one of them: judge again.
-    if ns.Finder and ns.Finder.ForgetVerdicts then pcall(ns.Finder.ForgetVerdicts, ns.Finder) end
+    if self.looking then return end
+    self.looking = true
+    local after = _G.C_Timer and _G.C_Timer.After
+    if type(after) == "function" then
+        after(self.SETTLE, function()
+            WeaponSkills.looking = false
+            pcall(WeaponSkills.Look, WeaponSkills)
+        end)
+    else
+        self.looking = false
+        self:Look()
+    end
 end
 
---- A skill was learned (the skill list or the spellbook changed): forget,
---- and let the banner look again at weapons waiting on one.
-function WeaponSkills:Learned()
-    self:Forget()
+--- Read the known skills once. A change (one learned) makes the finder judge
+--- again (a weapon's "Train" mark or an ignored type's "cantuse" is one of
+--- its verdicts), lets the upgrade quest look again, and lets the banner
+--- look again at weapons that were waiting on one.
+-- @return true when the known skills changed
+function WeaponSkills:Look()
+    local now = Signature(self:Known())
+    local before = self.signature
+    self.signature = now
+    if before == nil or before == now then return false end
+    if ns.Finder and ns.Finder.ForgetVerdicts then pcall(ns.Finder.ForgetVerdicts, ns.Finder) end
+    local quest = ns.UpgradeQuest
+    if quest and quest.SkillLearned then pcall(quest.SkillLearned, quest) end
     if ns.UpgradeChat and ns.UpgradeChat.SkillsChanged then
         pcall(ns.UpgradeChat.SkillsChanged, ns.UpgradeChat)
     end
+    return true
+end
+
+--- A skill may have been learned (the skill list or the spellbook changed).
+function WeaponSkills:Learned()
+    self:Forget()
 end
 
 --- The skill's spell as the client names it ("Stäbe"), or nil: the skill
@@ -328,8 +369,8 @@ function WeaponSkills:ShowMaster(link)
 end
 
 function WeaponSkills:OnEnable()
-    -- SPELLS_CHANGED comes often and only forgets; the other two are a
-    -- skill being learned.
+    -- All three only forget and look once the burst settles.
+    self.signature = Signature(self:ReadKnown())
     ns.RegisterEvent(self, "SPELLS_CHANGED", self.Forget)
     for _, event in ipairs({ "SKILL_LINES_CHANGED", "LEARNED_SPELL_IN_TAB" }) do
         ns.RegisterEvent(self, event, self.Learned)

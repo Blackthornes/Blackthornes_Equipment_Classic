@@ -352,6 +352,10 @@ function QuestLogUI:BuildRow(index)
     row.note:SetWordWrap(true)
     row.note:Hide()
 
+    -- Card J: a green mark when the quest's reward beats what you wear.
+    row.mark = Theme.CreateLabel(row, "small", "good", "RIGHT")
+    row.mark:Hide()
+
     -- Where the quest's item button goes (it is not a child of the panel).
     row.spot = CreateFrame("Frame", nil, row)
     row.spot:SetSize(ITEM, ITEM)
@@ -410,6 +414,21 @@ end
 --------------------------------------------------------------------------------
 
 --- The words for a quest's lines, and a key that changes when any do.
+--- The green mark for a quest whose reward is an upgrade ("+6% Head"),
+--- from the finder's last scan only (UpgradeQuest:RewardMark), or nil.
+function QuestLogUI.MarkText(questID)
+    local quest = ns.UpgradeQuest
+    if not (questID and quest and quest.RewardMark) then return nil end
+    local ok, mark = pcall(quest.RewardMark, quest, questID)
+    if not ok or type(mark) ~= "table" then return nil end
+    local slot = ns.Enchants and ns.Enchants.SlotName and ns.Enchants.SlotName(mark.slot) or ""
+    if mark.empty or (mark.percent or 0) <= 0 then
+        return slot ~= "" and slot or nil
+    end
+    if slot == "" then return ("+%d%%"):format(mark.percent) end
+    return L.Format("+%d%% %s", mark.percent, slot)
+end
+
 local function Words(quest, upgrades)
     local level = quest.level and quest.level > 0 and ("[%d] "):format(quest.level) or ""
     local color = ns.QuestLog.DIFFICULTY[ns.QuestLog.Difficulty(quest.level)]
@@ -423,18 +442,29 @@ local function Words(quest, upgrades)
         note = type(link) == "string" and L.Format("Part of your upgrade quest: %s", link) or L["Part of your upgrade quest"]
     end
 
-    local key = { title, tostring(quest.tracked), tostring(quest.item and quest.item.link), note or "" }
+    local mark = QuestLogUI.MarkText(quest.questID)
+    local key = { title, tostring(quest.tracked), tostring(quest.item and quest.item.link), note or "", mark or "" }
     for _, line in ipairs(lines) do key[#key + 1] = line.text end
-    return title, lines, note, table.concat(key, "\n")
+    return title, lines, note, table.concat(key, "\n"), mark
 end
 
 --- Fill a quest's row if its quest changed; returns how tall it is.
 function QuestLogUI:FillRow(row, quest, band, upgrades, picked)
     row.quest = quest
-    local title, lines, note, key = Words(quest, upgrades)
+    local title, lines, note, key, mark = Words(quest, upgrades)
     if row.key ~= key then
         row.key = key
         local textWidth = self.listWidth - MARK - 12 - (quest.item and (ITEM + 12) or 6)
+        if mark then
+            row.mark:SetText(mark)
+            row.mark:ClearAllPoints()
+            row.mark:SetPoint("TOPRIGHT", -(quest.item and (ITEM + 12) or 6), -4)
+            row.mark:Show()
+            local room = (row.mark.GetStringWidth and row.mark:GetStringWidth() or 0) + 8
+            textWidth = math.max(60, textWidth - room)
+        else
+            row.mark:Hide()
+        end
         row.title:SetWidth(textWidth)
         row.title:SetText(title)
         local height = 4 + Lines("small", title, textWidth) * LineHeight("small") + 2

@@ -167,19 +167,44 @@ function MapPins:MakePin(canvas)
             GameTooltip:AddLine(hunt.quest and L["Upgrade quest"] or L["Tracked upgrade"], Theme.Unpack("accent"))
         end
         if hunt.place.text then GameTooltip:AddLine(ns.Tracking.PlaceText(hunt.place), Theme.Unpack("text")) end
+        if hunt.marked then
+            GameTooltip:AddLine(L["Left-click: aim the arrow here"], 1, 1, 1)
+            GameTooltip:AddLine(L["Right-click: open the quest"], 1, 1, 1)
         -- Only where the game takes a pin of its own (never on Era).
-        if ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
+        elseif ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
             GameTooltip:AddLine(L["Click to pin it on your map"], Theme.Unpack("muted"))
         end
         GameTooltip:Show()
     end)
     pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    pin:SetScript("OnClick", function(self)
-        if self.hunt and ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
+    pcall(pin.RegisterForClicks, pin, "LeftButtonUp", "RightButtonUp")
+    pin:SetScript("OnClick", function(self, button)
+        if self.hunt and self.hunt.marked then
+            MapPins:SpotClick(button)
+        elseif self.hunt and ns.Waypoints and ns.Waypoints:GamePins(self.mapID) then
             ns.Waypoints:Pin(self.hunt.place, self.hunt.link)
         end
     end)
     return pin
+end
+
+--- The Show on map marker's clicks (Era: `Waypoints.marked`, our own pin;
+--- no game frame is touched). Left-click aims the quest arrow at it,
+--- right-click opens the upgrade quest. Answers what it did, for the tests.
+function MapPins:SpotClick(button)
+    local light = self.spotlight or (ns.Waypoints and ns.Waypoints.marked)
+    local place = light and (light.place or (light.x and light))
+    if not (place and place.zone) then return nil end
+    if button == "RightButton" then
+        local quest = ns.UpgradeQuest
+        if quest and quest.TurnOn then pcall(quest.TurnOn, quest) end
+        return "quest"
+    end
+    local arrow = ns.QuestArrow
+    if arrow and arrow.AimAtQuest then
+        pcall(arrow.AimAtQuest, arrow, light.questID, light.name, place)
+    end
+    return "arrow"
 end
 
 -- The name the place shows in the player's language; the data keeps English.

@@ -150,6 +150,11 @@ otherwise a table:
   so false while "Sell coins" is unticked). Soulbound can only be told from
   the bag slot, so without `bag` and `slot` green and better gear is never
   `sell`.
+- `never`: true when this class can never wear it (gear for other
+  classes, an armor or weapon kind it never learns, an off-hand without
+  dual wield ever); never for mail or plate learned later, Best Armor
+  Only or a hidden untrained weapon. Butler sells soulbound green gear
+  on it (2026-11-10, a player's report). Tested in `tools/test_butler.lua`.
 - `tool`: true for gathering and profession tools (`BagIcons.IsTool`,
   `BagIcons.TOOLS`) and fishing poles; a tool is never `sell`.
 - `alt`: only when it is no upgrade here, `{ key, gain, level }` for the
@@ -272,8 +277,8 @@ calls. `Logic/TradeskillsQueue.lua` calls, inside a pcall:
 
 ```lua
 ts.Queue:Ensure(recipeID, quantity)         -- at least that many queued; true, or nil and why
-ts.Queue:EnsureBuy(itemID, count, forItem)  -- that many on the list to buy for forItem; true, or nil and why
-ts.Queue:ForUpgrade(itemID)                 -- "craft", "buy" or nil; the button then reads Queued
+ts.Queue:EnsureBuy(itemID, count, forItem, forRecipe)  -- that many on the list to buy for forItem; true, or nil and why
+ts.Queue:ForUpgrade(itemID, recipeID)       -- "craft", "buy" or nil; the button then reads Queued
 ts.Queue:ShowQueue()                        -- a click on Queued opens the Queue tab
 ```
 
@@ -284,6 +289,16 @@ itself. A craft Tradeskills has not read yet falls back to its materials.
 The source is read again on each click (`TradeskillsQueue.Fresh`), since
 the upgrade quest keeps one from when it was picked. If these change in
 Tradeskills, change `Logic/TradeskillsQueue.lua` too.
+Materials for a pattern still to learn go on the list tied to its recipe
+(`forRecipe = { recipeID, name, crafts = 1 }`, 2026-11-07, a player found
+nothing in the queue after learning one), so Tradeskills queues the craft
+when it is learned (`Queue:QueueLearned`) and drops those lines when the
+craft is queued (`Queue:DropBoughtFor`). `ForUpgrade` is asked with the
+recipe ID too; while only materials are listed and the craft can now be
+made, the button reads Queue It again and a click queues the craft
+(`TradeskillsQueue:Label(itemID, source)`). Tested in `tools/test_tsqueue.lua`.
+Tradeskills Classic needs Forever's `af0f9af` for this; until it has it,
+the fourth argument is ignored and the button works as before.
 
 The Enchants view (see "Enchants for your gear") uses the same `Ensure`
 and `EnsureBuy` for its Queue it, and asks where a recipe is learned:
@@ -400,6 +415,83 @@ to the first slot with upgrades). `finderShow` is now "all" or "enchant";
 an older one-source value reads as gear. Enchants use the same slot
 column. All account wide; never rename them. Tested in
 `tools/test_finderslots.lua`.
+
+Scanning only when it matters (the owner said build it, 2026-11-08, after
+Equipment showed 30% CPU with the upgrade quest up, then again the same day
+when it still hitched every few seconds): the full search runs only on a new
+zone, gear worn, a level, talents, a recipe or skill learned, or a setting
+(`Finder:MarkStale`); a single item is judged when it lands in the bags
+(`UpgradeChat`) or a quest offers it (`QuestRewards`). No clock makes a
+scan old (`Finder:Latest` keeps it until `stale` or `JudgeKey` moves) and
+the bags never start a search. Item answers the finder asked for
+(`Finder:OnItemAnswer`) wait until none have come for `ANSWER_SETTLE` (2)
+seconds; only the first burst after a real change lets the scan be made
+once more (`followUp`, `AnswersSettled` returns it and passes it to the
+`WatchAnswers` listeners), since each scan asks about more items and the
+answers used to start another scan forever. Weapon skill events
+(`SPELLS_CHANGED` and the rest) settle `WeaponSkills.SETTLE` (1) second,
+and the verdicts are thrown away only when the known skills changed
+(`WeaponSkills:Look`, by `Signature`). The upgrade quest's level-up look
+(`LookForBetter`) and its wait for items (`WAIT_FOR_ITEMS`) stay, both
+bounded. The quest arrow reads its state every `REST_STEP` (0.5 s) while
+it has nowhere to point ("nowhere", "blind"); the glow still breathes every
+step. Tested in `tools/test_speed.lua` and `tools/test_upgradequest.lua`.
+
+Asking for the rest (a player's report, 2026-11-13: "Still querying the
+server" went up and down and never finished, with stutters, since the
+window scanned again after every burst of answers): a scan asks about
+`ASK_PER_SCAN` (40) items and keeps the rest in `Finder.queue`. While the
+window is open (`Finder.keepAsking`, set by `FinderUI`), each settled burst
+asks the next batch with no scan (`Finder:AskMore`), also after
+`ANSWER_WAIT` (5) seconds with no answer at all (`WaitForAnswers`).
+`WatchAnswers` listeners get `(again, done)`, and the window scans once
+more only on `again` or `done` (the queue is empty). An item asked
+`ASK_TRIES` times with no answer is given up on (`Finder:GaveUp`) and no
+longer counted as waiting, so the count reaches 0. No new words for
+players. Tested in `tools/test_speed.lua`.
+
+Worn gear the game lets go (a player's report, 2026-11-13: the window
+cycled, counts flipping and "You wear:" names blank): a worn link can read
+with no name and its stats nil. `JudgeKey` uses `Finder:WornState()`, a
+name-free key (`WornKey`) and the most worn stats ever read for that gear,
+so the verdicts stay. An item judged before keeps its verdict and is never
+asked about again; while fewer worn stats read than that most
+(`wornShort`), nothing new is judged and the worn items are asked for
+again. Tested in `tools/test_speed.lua`.
+
+Nothing scans itself again (the owner's report, 2026-11-13: the window
+still refreshed without end; "fix it once and for all"). The rule: a scan
+starts only on a real change, and nothing a scan does may start the next
+one. What holds it:
+
+- Only an answer the finder is waiting on counts (`Finder.pending`), never
+  one about an item it asked long ago; the client says the same event
+  whenever it loads an item for anyone. An item is not asked again while
+  its answer is due (`Finder:Awaited`, `ANSWER_WAIT`), so a layout that asks
+  as it draws (Dungeon Loot's `DL:Rows`) spends no tries.
+- A whole scan clears `stale` unless something changed while it ran
+  (`Finder.changes`, counted by `MarkStale`).
+- An upgrade a tab of the upgrade quest let go (the live judge says no, the
+  kept verdict yes) is not picked back until `Finder:JudgeKey` moves
+  (`UpgradeQuest:LetGo`, `LetGoNow`), and an answer about a tab's own
+  upgrade is looked at once per gear, level and weights
+  (`UpgradeQuest:OwnItemHeard`).
+- Events that say nothing new are dropped for every listener
+  (`ns.NothingChanged`, `QUIET` in `Core/Init.lua`): bags, worn gear, skills
+  and talents each pass only when their signature moved. Worn and bag
+  signatures leave the item's name out (`Items.LinkKey`), since a link can
+  read with no name; `TRAIT_CONFIG_UPDATED` is said for any trait tree, so
+  it passes only when the active config or a bought node moved
+  (`Weights:TalentSignature`, `Items:TalentSignature`; talents that can't
+  be read hold nothing back). A new quiet event needs a signature that
+  answers nil when it can't tell.
+
+A new listener for `GET_ITEM_INFO_RECEIVED` only redraws, debounced and
+while its window shows; it never calls `MarkStale`. No new words for
+players. Tested in `tools/test_refreshloop.lua`, `tools/test_quietgear.lua`,
+`tools/test_speed.lua`, `tools/test_upgradequest.lua` and
+`tools/test_weights.lua`.
+
 
 Solo quests (a player asked, the owner agreed 2026-10-06): a quest's
 11th field in `Sources.QUESTS` says what it needs besides the player
@@ -932,6 +1024,47 @@ last the session. Saved, account wide, never rename them:
 `dungeonLootRelPoint`, `dungeonLootX`, `dungeonLootY`. Tested in
 `tools/test_dungeonloot.lua`. Not yet seen in game.
 
+## The upgrade quest cards
+
+The owner said build it (2026-11-13, from the upgrade quest mockups, cards
+A to J; brought to Classic 2026-11-15 from Forever, set bonuses left out). Every piece reads only what
+`UpgradeQuest` already kept for the finder's last scan (kept per
+`finder.latest`), so a redraw works nothing out and nothing is scanned.
+
+- On the panel (`UI/QuestPanelMore.lua`, built and placed by
+  `UI/QuestPanel.lua`): Your Gear with its rating Poor, Fair, Good or Great
+  and how many upgrades wait (I, `UpgradeQuest:GearRating`,
+  `UpgradeQuest.RATINGS`); why this one was picked (A, `UpgradeQuest.Why`
+  gives "biggest", "easiest" or "mix", kept on the quest as `why`;
+  `WhyText` adds the zones away, "You picked this one" for a followed one);
+  what it asks of you as chips (C, `UpgradeQuest:Chips`: level, dungeon,
+  chain, standing, each green once met); Also good with the next picks on
+  the tab, a click switches (E); the Options count "Filters on:" (B) and
+  the Ignored and Done foot (G).
+- How You Gear Up (D): Anything, Quick and Close, No Dungeons, Dungeons
+  Please, Vendors First (`UpgradeQuest.STYLES`, `:Style`, `:Sets`,
+  `:SetStyle`, `StyleLines`). A style only ticks the boxes the panel has
+  (This Zone Only, Solo Quests Only), puts a tab first, or is read where
+  the quest picks ("easy", "noDungeon"); unticking a box it needs reads
+  Anything again (`BoxChanged`). Saved account wide as `upgradeQuestStyle`
+  (nil for Anything, the default; never rename it). A drop-down in the
+  panel's Options and "How You Gear Up:" on the Upgrade quest page of
+  Settings (`controls.questStyle`, its hover "This sets: ...").
+- Upgrade Done! (F, `UI/UpgradeDone.lua`): when the quest's gear goes on, a
+  gold plaque rises near the top of the screen with the item and its gain,
+  sparks fly and "Done: N" ticks up; a click puts it away, else it fades
+  after `HOLD`. Effects Full shows it all, Subtle no sparks or rise, Off the
+  plaque alone; the chime asks `ns.Muted()`. Nothing saved.
+- The map marker (H): on Era it is Equipment's own Show on map pin
+  (`Waypoints.marked`); left-click aims the quest arrow there, right-click
+  opens the quest (`MapPins:SpotClick`, the pin's hover adds both lines).
+- The quest log tab (J): a quest whose reward is an upgrade shows "+6% Head"
+  in green on its row (`UpgradeQuest:RewardMark`, `QuestLogUI.MarkText`;
+  an empty slot shows the slot name alone).
+
+Tested in `tools/test_upgradecards.lua` and `tools/test_upgradequest.lua`.
+Not yet seen in game.
+
 ## The Quest log tab
 
 The owner asked (2026-10-10) for the game's quest tracker inside the
@@ -1024,6 +1157,14 @@ or when a higher rank of the same name is known (the data skips a rank now
 and then; a player was told to train spells known a long time,
 2026-10-19). A trainer line in another language matches by name and the
 rank's number.
+which teaches nothing past 6, 2026-11-14): a trainer's window keeps
+`teaches`, the highest level it lists, and `CT:Nearest` passes by one
+that can't teach the highest level ready (`CT:NeedLevel`); an old record
+without it in a starting valley (`CT.STARTER_AREAS`) counts as teaching
+to `STARTER_TEACHES` (6). With none far enough, Show the way says the
+ones seen teach only up to level N. A trainer that stops early no longer
+marks later spells as taught by no trainer. Tested in
+`tools/test_classtraining.lua`.
 Skipping a spell (a player asked, the owner said build it,
 2026-10-22): right-click a spell in Equipment's Training drawer to skip
 it, and again to bring it back. Kept account wide in
@@ -1794,6 +1935,54 @@ behind one Options button (a row menu). Both panels have Transparent
 `questPanelSeeThrough`, never rename them). The finder's rows are one
 line, its filters one row, and "Judge Gear As:" is a drop-down in its
 header (the same saved spec). Show the Way does what Follow did too.
+
+## Mute All Sounds
+
+A player asked, the owner said build it (2026-11-12), in all five addons:
+one box quiets every sound every Blackthornes addon plays. "Mute All
+Sounds:" on the General page under Effects and `/beq mute [on|off]`; off unless ticked. It lives on
+the shared choices board (`UI/SharedChoices.lua`, the same file in all
+five): `SharedChoices:SetMute(on)` sets it and tells the others,
+`ns.Muted()` answers every play call, and each addon keeps it in its own
+account save as `muteSounds` and `muteSoundsAt` (never rename them). Each
+joins with a reader of those two (`Join(name, write, readMute)`), read at
+the first sound after its save loads, the newest winning, so an addon that
+was off when the box was ticked still goes quiet. Every `PlaySound` and
+`PlaySoundFile` asks `ns.Muted()` first, fallbacks too; a new sound must
+as well. Warnings still show on screen and in chat. Tested in
+`tools/test_housekit.lua`.
+
+## Window spots
+
+A player asked, the owner said build it (2026-11-12), in all five
+addons: windows remember where they were dragged. `UI/SharedWindow.lua`
+(FILE_VERSION 9 in Classic; `UI/WhatsNew.lua` FILE_VERSION 7) keeps the one
+window's spot beside each game window it docks to, once the player drags
+it there (`SharedWindow.Dropped`, account wide in every save as
+`oneWindowDockSpots[place]`), and small windows signed up with
+`SharedWindow.KeepSpot(frame, key)` keep their top left in
+`windowSpots[key] = { x, y }`, kept on screen when placed again. Never
+rename either. Tradeskills' sell list drawer can be dragged too
+(`PostPanel:MakeDraggable`, `SaveSpot`, `ns.db.postPanelSpot`). "Window
+Spots:" Set Default on the General page (Tradeskills: its look page) and
+`windows reset` on each addon's command run `SharedWindow.ResetAllSpots`,
+which clears both keys and calls each addon's own reset
+(`SharedWindow.AddSpotReset(name, fn)`); sizes, settings and data stay.
+Chat says "Every window is back in its first spot." Tested in
+`tools/test_sharedwindow.lua` and each addon's settings test
+
+(Tradeskills: `tools/test_resetwindows.lua`).
+
+## Shield tanks
+
+The owner's report (2026-11-13): a Protection paladin was offered two-handers.
+`SPECS.WARRIOR.prot` and `SPECS.PALADIN.prot` carry `shieldTank = true`
+(`Weights:ShieldTank(class, spec)`). For them `Compare:Judge` answers
+"cantuse" with `tankTwoHand` (no tooltip line, no bag arrow, Butler's
+`never` stays unset) for any two-hander, and a shield fills the off hand
+even while a two-hander is worn (`Against`, `ReplacedSlots`). The upgrade
+quest lets such a pick go quietly (`UpgradeQuest:TankTwoHand`) and
+`Alts:Judge` never offers one to a Protection alt. Bear Tank is left
 
 ## Writing for players
 
