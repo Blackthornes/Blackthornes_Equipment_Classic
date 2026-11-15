@@ -69,6 +69,47 @@ suite.check("a burst holds three timers, not six", #held == 3, #held)
 Run()
 suite.check("and the window hears once for the burst", looks == 3, looks)
 
+-- Asked a moment ago: a second scan (a tick box, a filter) does not ask
+-- again and spends no try. Only once its answer has had time to come.
+local realNow, clock = Finder.Now, os.time()
+Finder.Now = function() return clock end
+local realCached = _G.C_Item.IsItemDataCachedByID
+local have = {}
+_G.C_Item.IsItemDataCachedByID = function(id) return have[id] == true end
+Finder.asked, Finder.tries, Finder.pending, Finder.askedAt = {}, {}, {}, {}
+Finder.queue, Finder.followUp = nil, false
+requests, held, looks = {}, {}, 0
+suite.check("an item is asked about", Finder:Request(7010) == true and #requests == 1)
+suite.check("asked again at once, nothing goes out", Finder:Request(7010) == false and #requests == 1, #requests)
+suite.check("and no try is spent", Finder.tries[7010] == 1, Finder.tries[7010])
+suite.check("its answer is still due", Finder:AskMore() == 1 and #requests == 1, #requests)
+suite.check("so a wait is kept going", #held == 1, #held)
+
+-- The server dropped it: once the wait is over it is asked again, with no
+-- scan, three times in all, and then let go.
+clock = clock + Finder.ANSWER_WAIT + 1
+Run()
+suite.check("no answer at all asks again", #requests == 2 and Finder.tries[7010] == 2 and looks == 0,
+    #requests .. " " .. tostring(Finder.tries[7010]) .. " " .. looks)
+clock = clock + Finder.ANSWER_WAIT + 1
+Run()
+suite.check("and a third time", #requests == 3 and Finder.tries[7010] == 3 and looks == 0, #requests)
+clock = clock + Finder.ANSWER_WAIT + 1
+Run()
+suite.check("then it is given up on", #requests == 3 and Finder:GaveUp(7010) == true, #requests)
+suite.check("and the window hears once that nothing more is due", looks == 1 and #held == 0,
+    looks .. " " .. #held)
+
+-- An item the client got by itself (a tooltip loaded it) is not asked again.
+suite.check("another item is asked about", Finder:Request(7011) == true and #requests == 4)
+have[7011] = true
+clock = clock + Finder.ANSWER_WAIT + 1
+suite.check("one the client now has is not asked again", Finder:AskMore() == 0 and #requests == 4, #requests)
+
+_G.C_Item.IsItemDataCachedByID = realCached
+
+Finder.Now = realNow
+Finder.asked, Finder.tries, Finder.pending, Finder.askedAt = {}, {}, {}, {}
 _G.C_Timer.After = realAfter
 _G.C_Item.RequestLoadItemDataByID = realRequest
 Finder.QuestWindowOpen = realQuestWindow

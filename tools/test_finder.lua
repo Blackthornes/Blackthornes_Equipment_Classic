@@ -235,7 +235,16 @@ suite.check("once it arrives it is offered", Offered(Finder:Scan(), 5) == "1003,
 asked = {}
 Finder.tries = nil
 cached[1003] = false
-for _ = 1, 6 do Finder.judged = nil Finder:Scan() end
+-- Each scan comes well after the last: an item asked a moment ago is not
+-- asked again until its answer has had time to come.
+local realNow, clock = Finder.Now, os.time()
+Finder.Now = function() return clock end
+for _ = 1, 6 do
+    clock = clock + 60
+    Finder.judged = nil
+    Finder:Scan()
+end
+Finder.Now = realNow
 local times = 0
 for _, id in ipairs(asked) do if id == 1003 then times = times + 1 end end
 suite.check("an item that never arrives is asked three times at most", times == 3, times)

@@ -38,6 +38,13 @@ local ASK_PER_SCAN = 40
 -- windows (the quest reward choices) waited behind it.
 local ASK_TRIES = 3
 
+-- How long a batch asked for may go without a single answer before the
+-- next step is taken anyway (the server drops some of what it is asked).
+-- An item is not asked about again sooner than this, so several scans in
+-- a row (a tick box, a filter) spend one try on it between them, not one
+-- each.
+local ANSWER_WAIT = 5
+
 -- How many upgrades to keep per slot.
 local PER_SLOT = 3
 Finder.PER_SLOT = PER_SLOT
@@ -584,18 +591,22 @@ end
 --- link, another addon's window) does not set off a scan.
 --- Nothing is asked while a quest giver's window is open: the reward
 --- choices there wait on the same queue, and the scan can ask again once it
---- closes. An item asked ASK_TRIES times without arriving is not asked again.
+--- closes. An item asked ASK_TRIES times without arriving is not asked again,
+--- and one asked a moment ago is not asked twice while its answer is due.
 --- @return true when the server was asked
 function Finder:Request(itemID)
     self.asked = self.asked or {}
     self.tries = self.tries or {}
     if (self.tries[itemID] or 0) >= ASK_TRIES then return false end
     if self.QuestWindowOpen() then return false end
+    if self:Awaited(itemID) then return false end
     self.asked[itemID] = true
     -- Waiting on the server for this one. Only its answer counts; the client
     -- says the same event again whenever it loads the item for anyone else.
     self.pending = self.pending or {}
     self.pending[itemID] = true
+    self.askedAt = self.askedAt or {}
+    self.askedAt[itemID] = self.Now()
     self.tries[itemID] = (self.tries[itemID] or 0) + 1
     local C = _G.C_Item
     local request = C and C.RequestLoadItemDataByID
@@ -605,6 +616,16 @@ function Finder:Request(itemID)
         Read(C and C.GetItemInfo or _G.GetItemInfo, itemID)
     end
     return true
+end
+
+--- Was the server asked about this item a moment ago, with no answer yet?
+--- Its answer is still due, so asking again would only spend a try.
+function Finder:Awaited(itemID)
+    if not (self.pending and self.pending[itemID]) then return false end
+    local at = self.askedAt and self.askedAt[itemID]
+    if type(at) ~= "number" then return false end
+    local waited = self.Now() - at
+    return waited >= 0 and waited < ANSWER_WAIT
 end
 
 --- Has the server been asked about this item as often as it will be?
@@ -821,6 +842,9 @@ end
 function Finder:Build(only, ahead, pause)
     local player = self:Player()
     if not player then return nil, "nolevel" end
+    -- What had changed when this scan began. A sliced scan runs over many
+    -- frames, and a change that lands meanwhile leaves it out of date.
+    local changes = self.changes or 0
 
     local weights = Weights:ForPlayer()
     if not weights then return nil, "noweights" end
@@ -847,6 +871,8 @@ function Finder:Build(only, ahead, pause)
     local worn = Compare:WornIDs()
     local slots, checked, waiting, asked = {}, 0, 0, 0
     local queue = {}
+    -- Items an earlier scan asked about a moment ago, their answers still due.
+    local held = 0
     -- Worn gear the client let go of: ask for it back, and judge nothing new
     -- until it is in, since every item would be weighed against nothing.
     local _, wornBest, wornRead = self:WornState()
@@ -871,7 +897,11 @@ function Finder:Build(only, ahead, pause)
                 -- One the server never answered is not waited on for ever.
                 if not self:GaveUp(itemID) then
                     waiting = waiting + 1
-                    if asked < ASK_PER_SCAN then
+                    if self:Awaited(itemID) then
+                        -- Asked by the scan before this one. It counts
+                        -- toward this batch and is not asked twice.
+                        held = held + 1
+                    elseif asked + held < ASK_PER_SCAN then
                         if self:Request(itemID) then asked = asked + 1 end
                     else
                         -- Asked for a batch at a time once these answers
@@ -924,11 +954,17 @@ function Finder:Build(only, ahead, pause)
     }
     if not only and reach == level then
         self.latest, self.latestAt, self.latestKey = found, self.Now(), judgedKey
+        -- A whole scan with nothing changed meanwhile is up to date, whoever
+        -- made it, so the upgrade quest and the character sheet read this
+        -- one and start no second scan of their own.
+        if (self.changes or 0) == changes then self.stale = false end
     end
     -- What this scan left unasked. Set only by a scan that finished, so one
     -- dropped half way keeps the list the last whole scan made.
     self.queue = queue
-    if asked > 0 and #queue > 0 then self:WaitForAnswers() end
+    -- Something is due from the server. If none of it comes, the next step
+    -- is taken anyway, so a batch the server drops is not waited on for ever.
+    if asked > 0 or held > 0 then self:WaitForAnswers() end
     return found
 end
 
@@ -1008,6 +1044,7 @@ end
 function Finder:MarkStale()
     self.stale = true
     self.followUp = true
+    self.changes = (self.changes or 0) + 1
 end
 
 -- How long after the last answer the server sent about items a scan asked
@@ -1015,9 +1052,6 @@ end
 local ANSWER_SETTLE = 2
 Finder.ANSWER_SETTLE = ANSWER_SETTLE
 
--- How long a batch asked for may go without a single answer before the
--- next step is taken anyway (the server drops some of what it is asked).
-local ANSWER_WAIT = 5
 Finder.ANSWER_WAIT = ANSWER_WAIT
 
 --- What wants to hear once a burst of item answers has settled, each
@@ -1038,7 +1072,10 @@ end
 function Finder:AnswersSettled()
     local again = self.followUp == true
     self.followUp = false
-    if again then self.stale = true end
+    if again then
+        self.stale = true
+        self.changes = (self.changes or 0) + 1
+    end
     -- The items the last scan had no room to ask about are asked for here,
     -- a batch at a time, with no scan in between: scanning the whole list
     -- for every batch froze the game every few seconds until all were in.
@@ -1063,18 +1100,33 @@ function Finder:KeepsAsking()
 end
 
 --- Ask the server about the next batch the last scan left unasked.
---- @return how many were asked
+--- @return how many answers are now due (asked here, or a moment ago)
 function Finder:AskMore()
     local queue = self.queue
-    local asked = 0
+    local asked, held = 0, 0
+    -- First what was asked before and never answered: the server drops some
+    -- of a burst. Asked again here, with no scan in between, until each has
+    -- had its tries. One asked a moment ago is left to wait.
+    for itemID in pairs(self.pending or {}) do
+        if self:GaveUp(itemID) then
+            -- Left as it is: should its answer come late, it still counts.
+        elseif self:IsCached(itemID) then
+            -- The client has it now, though its answer was never heard.
+            self.pending[itemID] = nil
+        elseif self:Awaited(itemID) then
+            held = held + 1
+        elseif asked < ASK_PER_SCAN and self:Request(itemID) then
+            asked = asked + 1
+        end
+    end
     while queue and #queue > 0 and asked < ASK_PER_SCAN do
         local itemID = table.remove(queue)
         if not self:IsCached(itemID) and self:Request(itemID) then
             asked = asked + 1
         end
     end
-    if asked > 0 then self:WaitForAnswers() end
-    return asked
+    if asked > 0 or held > 0 then self:WaitForAnswers() end
+    return asked + held
 end
 
 --- A batch was asked for. Should not one answer come within ANSWER_WAIT
