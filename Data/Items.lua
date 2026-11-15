@@ -689,6 +689,13 @@ function Items:WornSignature()
     return table.concat(parts, ";")
 end
 
+--- The talents bought, as one string (Weights:TalentSignature), or nil.
+function Items:TalentSignature()
+    local weights = ns.Weights
+    if not (weights and type(weights.TalentSignature) == "function") then return nil end
+    return weights:TalentSignature()
+end
+
 Items.Call = Call
 
 --------------------------------------------------------------------------------

@@ -771,6 +771,47 @@ function Weights:ForgetPoints()
     pointsRead = nil
 end
 
+--- The talents the character has bought, as one string: the same string
+--- means the talents are as they were. The client says TRAIT_CONFIG_UPDATED
+--- for any trait tree, not only the class's talents, and each one used to
+--- throw every upgrade verdict away and start a new scan. nil when the
+--- talents can't be read, so nothing is held back.
+function Weights:TalentSignature()
+    local talents = type(C_ClassTalents) == "table" and C_ClassTalents
+    local traits = type(C_Traits) == "table" and C_Traits
+    if talents and traits and type(talents.GetActiveConfigID) == "function"
+        and type(traits.GetConfigInfo) == "function"
+        and type(traits.GetTreeNodes) == "function"
+        and type(traits.GetNodeInfo) == "function" then
+        local ok, configID = pcall(talents.GetActiveConfigID)
+        if not ok or not configID then return nil end
+        local okInfo, info = pcall(traits.GetConfigInfo, configID)
+        if not okInfo or type(info) ~= "table" or type(info.treeIDs) ~= "table" then return nil end
+
+        local parts = {}
+        for _, treeID in ipairs(info.treeIDs) do
+            local okNodes, nodes = pcall(traits.GetTreeNodes, treeID)
+            if not okNodes or type(nodes) ~= "table" then return nil end
+            for _, nodeID in ipairs(nodes) do
+                local okNode, node = pcall(traits.GetNodeInfo, configID, nodeID)
+                if not okNode or type(node) ~= "table" then return nil end
+                local ranks = tonumber(node.ranksPurchased) or 0
+                if ranks > 0 then
+                    local entry = type(node.activeEntry) == "table" and node.activeEntry.entryID
+                    parts[#parts + 1] = tostring(nodeID) .. "=" .. ranks .. ":" .. tostring(entry or "")
+                end
+            end
+        end
+        table.sort(parts)
+        return "c" .. tostring(configID) .. ";" .. table.concat(parts, ";")
+    end
+
+    -- A client with the old talent tabs: the points in each.
+    local points = self:TreePoints(self:PlayerClass())
+    if type(points) ~= "table" then return nil end
+    return "t" .. table.concat(points, ",")
+end
+
 function Weights:OnEnable()
     for _, event in ipairs({ "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE", "CHARACTER_POINTS_CHANGED",
         "PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD" }) do

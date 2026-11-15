@@ -253,9 +253,11 @@ end
 -- A skill point (crafting, gathering or a weapon swing) fires
 -- SKILL_LINES_CHANGED; only a skill learned or dropped is passed on, since
 -- a point threw every upgrade verdict away and started a new upgrade scan
--- (a hitch on some finished crafts, 2026-10-11).
+-- (a hitch on some finished crafts, 2026-10-11). TRAIT_CONFIG_UPDATED is
+-- said for every trait tree the client has; only a change to the talents
+-- bought is passed on.
 local QUIET = { BAG_UPDATE_DELAYED = "BagSignature", PLAYER_EQUIPMENT_CHANGED = "WornSignature",
-    SKILL_LINES_CHANGED = "SkillSignature" }
+    SKILL_LINES_CHANGED = "SkillSignature", TRAIT_CONFIG_UPDATED = "TalentSignature" }
 local lastSeen = {}
 
 --- True when the event changed nothing worth looking at again.

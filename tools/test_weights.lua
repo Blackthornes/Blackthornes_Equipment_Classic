@@ -144,12 +144,62 @@ _G.GetTime = function() return clock end
 for _ = 1, 20 do ns.Weights:CurrentSpec() end
 suite.check("twenty asks walk the talents once", walks == 1, walks)
 ns.eventFrame:GetScript("OnEvent")(ns.eventFrame, "TRAIT_CONFIG_UPDATED")
+-- The event itself walks the tree once, to see whether the talents moved.
+local before = walks
 ns.Weights:CurrentSpec()
-suite.check("a talent change reads them again", walks == 2, walks)
+suite.check("a talent change reads them again", walks == before + 1, walks)
 clock = clock + 6
 ns.Weights:CurrentSpec()
-suite.check("and so does the time running out", walks == 3, walks)
+suite.check("and so does the time running out", walks == before + 2, walks)
 _G.GetTime = nil
+
+-- The client says TRAIT_CONFIG_UPDATED for any trait tree. Only a change to
+-- the talents bought is passed on: the rest used to throw every upgrade
+-- verdict away and start a new scan.
+local bought = { [1020] = 1, [5020] = 3 }
+ns = LoadTraits(bought)
+ns.Weights:OnEnable()
+ns.Finder:OnEnable()
+local function Talents()
+    ns.eventFrame:GetScript("OnEvent")(ns.eventFrame, "TRAIT_CONFIG_UPDATED")
+end
+local first = ns.Weights:TalentSignature()
+suite.check("the talents bought read as one string", type(first) == "string" and first ~= "", first)
+suite.check("the same talents read the same", ns.Weights:TalentSignature() == first)
+Talents()
+local generation, changes = ns.Finder.judgeGeneration, ns.Finder.changes
+ns.Finder.stale = false
+Talents()
+Talents()
+suite.check("an event with the same talents throws no verdict away",
+    ns.Finder.judgeGeneration == generation, ns.Finder.judgeGeneration)
+suite.check("and starts no new scan", ns.Finder.stale == false and ns.Finder.changes == changes)
+suite.check("it is dropped for every listener", ns.NothingChanged("TRAIT_CONFIG_UPDATED") == true)
+-- A point spent is a real change.
+local realInfo = _G.C_Traits.GetNodeInfo
+_G.C_Traits.GetNodeInfo = function(config, nodeID)
+    local node = realInfo(config, nodeID)
+    if nodeID == 1020 and type(node) == "table" then
+        local copy = {}
+        for key, value in pairs(node) do copy[key] = value end
+        copy.ranksPurchased = 2
+        return copy
+    end
+    return node
+end
+suite.check("a point spent reads as another string", ns.Weights:TalentSignature() ~= first)
+Talents()
+suite.check("and its event is passed on", ns.Finder.judgeGeneration ~= generation and ns.Finder.stale == true)
+-- Talents that can't be read hold nothing back.
+ns = LoadTraits(bought, { config = false })
+ns.Weights:OnEnable()
+ns.Finder:OnEnable()
+Talents()
+generation = ns.Finder.judgeGeneration
+ns.Finder.stale = false
+Talents()
+suite.check("talents that can't be read hold no event back",
+    ns.Finder.judgeGeneration ~= generation and ns.Finder.stale == true)
 
 _G.C_ClassTalents, _G.C_Traits = nil, nil
 
