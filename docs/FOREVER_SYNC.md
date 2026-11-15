@@ -91,6 +91,9 @@ Brought over one at a time since:
   (only their spell power halved, see "Healers' spell power" in
   `docs/CLASSIC_DIFFERENCES.md`). Left out for now: set bonuses
   (`72f72d7` and what follows, `ReplacedSlots` and `WithSets` in
-  `Compare.lua`), the upgrade quest panel redesign (`53d4d5d` and what
-  follows, `6955d86` with it; a mockup first), and "its giver no longer
-  offers it" (`NotOffered`).
+  `Compare.lua`) and "its giver no longer offers it" (`NotOffered`).
+  The upgrade quest panel redesign came after the mockup (the owner said
+  build it, 2026-11-15): `215bfc8`, `53d4d5d`, `323d0c1`, `2b4c6b5`,
+  `911fd57`, `01e2083`, `c024185`, `4b2b0b0` and `6955d86`. The map marker
+  clicks went on Era's own Show on map pin (`Waypoints.marked`), since
+  Classic has no `MapPins:Spotlight`.

@@ -1024,6 +1024,47 @@ last the session. Saved, account wide, never rename them:
 `dungeonLootRelPoint`, `dungeonLootX`, `dungeonLootY`. Tested in
 `tools/test_dungeonloot.lua`. Not yet seen in game.
 
+## The upgrade quest cards
+
+The owner said build it (2026-11-13, from the upgrade quest mockups, cards
+A to J; brought to Classic 2026-11-15 from Forever, set bonuses left out). Every piece reads only what
+`UpgradeQuest` already kept for the finder's last scan (kept per
+`finder.latest`), so a redraw works nothing out and nothing is scanned.
+
+- On the panel (`UI/QuestPanelMore.lua`, built and placed by
+  `UI/QuestPanel.lua`): Your Gear with its rating Poor, Fair, Good or Great
+  and how many upgrades wait (I, `UpgradeQuest:GearRating`,
+  `UpgradeQuest.RATINGS`); why this one was picked (A, `UpgradeQuest.Why`
+  gives "biggest", "easiest" or "mix", kept on the quest as `why`;
+  `WhyText` adds the zones away, "You picked this one" for a followed one);
+  what it asks of you as chips (C, `UpgradeQuest:Chips`: level, dungeon,
+  chain, standing, each green once met); Also good with the next picks on
+  the tab, a click switches (E); the Options count "Filters on:" (B) and
+  the Ignored and Done foot (G).
+- How You Gear Up (D): Anything, Quick and Close, No Dungeons, Dungeons
+  Please, Vendors First (`UpgradeQuest.STYLES`, `:Style`, `:Sets`,
+  `:SetStyle`, `StyleLines`). A style only ticks the boxes the panel has
+  (This Zone Only, Solo Quests Only), puts a tab first, or is read where
+  the quest picks ("easy", "noDungeon"); unticking a box it needs reads
+  Anything again (`BoxChanged`). Saved account wide as `upgradeQuestStyle`
+  (nil for Anything, the default; never rename it). A drop-down in the
+  panel's Options and "How You Gear Up:" on the Upgrade quest page of
+  Settings (`controls.questStyle`, its hover "This sets: ...").
+- Upgrade Done! (F, `UI/UpgradeDone.lua`): when the quest's gear goes on, a
+  gold plaque rises near the top of the screen with the item and its gain,
+  sparks fly and "Done: N" ticks up; a click puts it away, else it fades
+  after `HOLD`. Effects Full shows it all, Subtle no sparks or rise, Off the
+  plaque alone; the chime asks `ns.Muted()`. Nothing saved.
+- The map marker (H): on Era it is Equipment's own Show on map pin
+  (`Waypoints.marked`); left-click aims the quest arrow there, right-click
+  opens the quest (`MapPins:SpotClick`, the pin's hover adds both lines).
+- The quest log tab (J): a quest whose reward is an upgrade shows "+6% Head"
+  in green on its row (`UpgradeQuest:RewardMark`, `QuestLogUI.MarkText`;
+  an empty slot shows the slot name alone).
+
+Tested in `tools/test_upgradecards.lua` and `tools/test_upgradequest.lua`.
+Not yet seen in game.
+
 ## The Quest log tab
 
 The owner asked (2026-10-10) for the game's quest tracker inside the
