@@ -190,3 +190,11 @@ forms scale with the weapon. On Era they don't, so Classic's set has
 `meleeDps = 0.3`, a tie-breaker. Forever also moved Feral Combat to a cat
 set (less stamina and armor, no dodge or defense); Classic keeps its Feral
 Combat weights as they were.
+
+## Healers' spell power
+
+Forever's `f83b893` counts gear that adds "damage and healing" toward both
+spell power and healing, and halves the healers' spell power weight (0.8
+to 0.4, Holy 0.9 to 0.45) so it isn't counted twice. Classic takes both,
+but keeps its own weapon damage (0.3) and armor (0.01) weights for
+Restoration druids and shamans, as for every caster (`f4a4f22`).

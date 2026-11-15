@@ -77,3 +77,20 @@ Brought over one at a time since:
 - `db40457` The upgrade banner can be dragged and keeps its spot per
   character, right-click puts it back (2026-11-07, the owner said yes; as it
   is, with its six-language hover line).
+- Weekly check of 2026-11-14 (the owner said do them all, 2026-11-15):
+  `0410c9e` and `cca5fc1` Mute All Sounds and window spots
+  (`UI/SharedWindow.lua` FILE_VERSION 9 and `UI/WhatsNew.lua` FILE_VERSION
+  7, the same in all five Classic repos; the window test uses Era's
+  `AuctionFrame`), `2638eef` Queue It on a later pattern (needs
+  Tradeskills' `af0f9af`), and the fixes `0252e00`, `39a97ee`, `02a0b14`,
+  `3ffd3da`, `f83b893`, `b49f9dc`, `9e8c4b9`, `5516776`, `7fa5228`,
+  `e9d2298`, `121d28b`, `e6f59e1`, `ae7ab5e`, `d71177a` and `890e67e`.
+  Kept Classic's own: the talent events (`CHARACTER_POINTS_CHANGED`,
+  `PLAYER_TALENT_UPDATE`) wherever Forever lists only
+  `TRAIT_CONFIG_UPDATED`, and the healers' weapon damage and armor weights
+  (only their spell power halved, see "Healers' spell power" in
+  `docs/CLASSIC_DIFFERENCES.md`). Left out for now: set bonuses
+  (`72f72d7` and what follows, `ReplacedSlots` and `WithSets` in
+  `Compare.lua`), the upgrade quest panel redesign (`53d4d5d` and what
+  follows, `6955d86` with it; a mockup first), and "its giver no longer
+  offers it" (`NotOffered`).
