@@ -2222,11 +2222,11 @@ end
 -- Why words by `why` and how far away; worked out once a quest and zone.
 local WHY_WORDS = {
     biggest = { L["Biggest gain on this tab"], L["Biggest gain on this tab, in this zone"],
-        L["Biggest gain on this tab, 1 zone away"], "Biggest gain on this tab, %d zones away" },
+        L["Biggest gain on this tab, 1 zone away"], L["Biggest gain on this tab, %d zones away"] },
     easiest = { L["Easiest one on this tab"], L["Easiest one on this tab, in this zone"],
-        L["Easiest one on this tab, 1 zone away"], "Easiest one on this tab, %d zones away" },
+        L["Easiest one on this tab, 1 zone away"], L["Easiest one on this tab, %d zones away"] },
     mix = { L["Best mix of gain and ease on this tab"], L["Best mix of gain and ease on this tab, in this zone"],
-        L["Best mix of gain and ease on this tab, 1 zone away"], "Best mix of gain and ease on this tab, %d zones away" },
+        L["Best mix of gain and ease on this tab, 1 zone away"], L["Best mix of gain and ease on this tab, %d zones away"] },
 }
 local whyKept = {}
 
