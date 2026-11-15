@@ -2050,7 +2050,7 @@ function FinderUI:FillRow(row, line)
         and ns.TradeskillsQueue.CraftSource(line.sources) or nil
     row.queueIt.source = craft
     if craft then
-        row.queueIt:SetText(ns.TradeskillsQueue:Label(craft.itemID))
+        row.queueIt:SetText(ns.TradeskillsQueue:Label(craft.itemID, craft))
         row.queueIt:Show()
     else
         row.queueIt:Hide()

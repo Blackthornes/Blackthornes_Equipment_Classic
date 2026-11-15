@@ -60,18 +60,41 @@ function TSQueue.Plan(source)
     return "buy"
 end
 
+--- The recipe that makes this gear, from the data (its spell ID).
+local function RecipeOf(itemID)
+    local craft = ns.Crafts and ns.Crafts.ITEMS[itemID]
+    return craft and craft[3] or nil
+end
+
 --- What Tradeskills already holds for this gear: "craft", "buy" or nil.
+--- The recipe goes along so materials put on the list for it count too.
 function TSQueue:Holds(itemID)
     local queue = TSQueueModule()
     if not (queue and type(queue.ForUpgrade) == "function") then return nil end
-    local ok, held = pcall(queue.ForUpgrade, queue, itemID)
+    local ok, held = pcall(queue.ForUpgrade, queue, itemID, RecipeOf(itemID))
     if ok and (held == "craft" or held == "buy") then return held end
     return nil
 end
 
---- The button's words: "Queued" once Tradeskills holds it.
-function TSQueue:Label(itemID)
-    return self:Holds(itemID) and L["Queued"] or L["Queue It"]
+--- Only its materials are on the list, but it can be made now: the click
+--- queues the craft. A pattern bought and learned after the first click
+--- left the button on Queued with nothing in the queue (a player's report,
+--- 2026-11-07).
+local function CanQueueCraftNow(held, source)
+    return held == "buy" and source ~= nil and TSQueue.Plan(source) == "craft"
+end
+
+--- The button's words: "Queued" once Tradeskills holds it, unless only its
+--- materials are listed and it can be made now.
+-- @param source optional: the crafted source the row shows
+function TSQueue:Label(itemID, source)
+    local held = self:Holds(itemID)
+    if not held then return L["Queue It"] end
+    -- Read again only then: a kept source can be from before the recipe was learned.
+    if held == "buy" and source and CanQueueCraftNow(held, TSQueue.Fresh(source)) then
+        return L["Queue It"]
+    end
+    return L["Queued"]
 end
 
 local function Name(itemID)
@@ -85,11 +108,21 @@ local function Name(itemID)
     return L["that upgrade"]
 end
 
+--- The item's own name, plain, for Tradeskills' list.
+local function PlainName(itemID)
+    local ok, name = pcall(function()
+        return C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(itemID)
+            or (GetItemInfo and GetItemInfo(itemID))
+    end)
+    return ok and type(name) == "string" and name or nil
+end
+
 --- The button's tooltip: a title and what a click does.
 function TSQueue:Explain(source)
     source = TSQueue.Fresh(source)
     if not source then return L["Queue It"], nil end
-    if self:Holds(source.itemID) then
+    local held = self:Holds(source.itemID)
+    if held and not CanQueueCraftNow(held, source) then
         return L["In Tradeskills' queue"], L["Click to open Tradeskills on the Queue tab."]
     end
     local plan = TSQueue.Plan(source)
@@ -106,13 +139,16 @@ function TSQueue:Explain(source)
         L["Nobody on your account makes it, so it goes on Tradeskills' shopping list to buy."]
 end
 
---- Every material of a crafted item onto the list to buy, for that item.
-local function BuyMaterials(queue, itemID)
+--- Every material of a crafted item onto the list to buy. Tied to its
+--- recipe, as Tradeskills' own Learn next does: once this character learns
+--- it, Tradeskills queues the craft itself and lets these lines go.
+local function BuyMaterials(queue, itemID, name)
     local craft = ns.Crafts and ns.Crafts.ITEMS[itemID]
     local list = craft and craft.m
     if not list or #list == 0 then return nil, L["its materials aren't known"] end
+    local forRecipe = craft[3] and { recipeID = craft[3], name = name, crafts = 1 } or nil
     for i = 1, #list, 2 do
-        local ok, done, why = pcall(queue.EnsureBuy, queue, list[i], list[i + 1], itemID)
+        local ok, done, why = pcall(queue.EnsureBuy, queue, list[i], list[i + 1], itemID, forRecipe)
         if not ok then return nil, L["Tradeskills ran into an error"] end
         if not done then return nil, why end
     end
@@ -133,7 +169,8 @@ function TSQueue:Queue(source)
     local name = Name(itemID)
 
     -- Already there: the click opens it instead.
-    if self:Holds(itemID) then return self:ShowQueue() end
+    local held = self:Holds(itemID)
+    if held and not CanQueueCraftNow(held, source) then return self:ShowQueue() end
 
     local plan = TSQueue.Plan(source)
     local done, why
@@ -148,14 +185,14 @@ function TSQueue:Queue(source)
             return true
         end
         -- Tradeskills has not read the recipe yet: its materials still help.
-        local bought, buyWhy = BuyMaterials(queue, itemID)
+        local bought, buyWhy = BuyMaterials(queue, itemID, PlainName(itemID))
         if bought then
             ns.Print(L.Format("Put the materials for %s on Tradeskills' shopping list (%s).", name, why or L["it couldn't queue the craft"]))
             return true
         end
         why = buyWhy or why
     elseif plan == "materials" then
-        done, why = BuyMaterials(queue, itemID)
+        done, why = BuyMaterials(queue, itemID, PlainName(itemID))
         if done then
             ns.Print(L.Format("Put the materials for %s on Tradeskills' shopping list.", name))
             return true

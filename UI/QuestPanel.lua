@@ -1071,7 +1071,7 @@ function QuestPanel:FillBody(quest, steps, current, done)
     local textWidth = WIDTH - PAD * 2 - ICON - 12
     local source = quest.source
     if source and source.kind == "craft" and ns.TradeskillsQueue and ns.TradeskillsQueue:Available() then
-        self.queueButton:SetText(ns.TradeskillsQueue:Label(quest.itemID or source.itemID))
+        self.queueButton:SetText(ns.TradeskillsQueue:Label(quest.itemID or source.itemID, source))
         self.queueButton:Show()
         -- The button grows to fit its words (German runs longer).
         local okWidth, queueWidth = pcall(self.queueButton.GetWidth, self.queueButton)
