@@ -621,6 +621,14 @@ function Items:SlotCount(bag, slot)
     return tonumber(count) or 1
 end
 
+--- A link without its name: the item string alone. The client lets an item
+--- go from its memory now and then, and its link then reads with no name
+--- ("[]"); that is no change to what is worn or carried.
+function Items.LinkKey(link)
+    if type(link) ~= "string" then return nil end
+    return link:match("item:[^|%[]+") or link
+end
+
 --- Everything in the bags with how many, ammo without its count, as one
 --- string: the same string means nothing changed but the ammo spent.
 function Items:BagSignature()
@@ -630,7 +638,7 @@ function Items:BagSignature()
             local link = self:InBag(bag, slot)
             if link then
                 local count = self.IsAmmo(link) and "" or ("x" .. self:SlotCount(bag, slot))
-                parts[#parts + 1] = bag .. ":" .. slot .. "=" .. link .. count
+                parts[#parts + 1] = bag .. ":" .. slot .. "=" .. Items.LinkKey(link) .. count
             end
         end
     end
@@ -677,7 +685,7 @@ end
 --- Everything worn, leaving out the ammo slot, as one string.
 function Items:WornSignature()
     local parts = {}
-    for slot = 1, 19 do parts[slot] = self:Equipped(slot) or "-" end
+    for slot = 1, 19 do parts[slot] = Items.LinkKey(self:Equipped(slot)) or "-" end
     return table.concat(parts, ";")
 end
 
