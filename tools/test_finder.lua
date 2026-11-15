@@ -222,6 +222,7 @@ local asked = {}
 local cached = { [1003] = false }
 C_Item.IsItemDataCachedByID = function(id) if cached[id] == false then return false end return true end
 C_Item.RequestLoadItemDataByID = function(id) asked[#asked + 1] = id end
+Finder.judged = nil   -- as if never judged before
 local waiting = Finder:Scan()
 suite.check("an item the client has not seen is waited on", waiting.waiting == 1, waiting.waiting)
 suite.check("and asked about", asked[1] == 1003)
@@ -234,7 +235,7 @@ suite.check("once it arrives it is offered", Offered(Finder:Scan(), 5) == "1003,
 asked = {}
 Finder.tries = nil
 cached[1003] = false
-for _ = 1, 6 do Finder:Scan() end
+for _ = 1, 6 do Finder.judged = nil Finder:Scan() end
 local times = 0
 for _, id in ipairs(asked) do if id == 1003 then times = times + 1 end end
 suite.check("an item that never arrives is asked three times at most", times == 3, times)
@@ -243,6 +244,7 @@ suite.check("an item that never arrives is asked three times at most", times == 
 -- choices wait on the same queue.
 asked = {}
 cached[1005] = false
+Finder.judged = nil
 QuestFrame = { IsShown = function() return true end }
 Finder:Scan()
 suite.check("nothing is asked while the quest window is open", #asked == 0, #asked)

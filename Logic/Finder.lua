@@ -691,11 +691,40 @@ local function WornStatsRead()
     return read
 end
 
+--- The gear worn as one string, by item string only. A worn link the
+--- client has let go of reads with no name ("[]"), and its name coming and
+--- going must not count as a gear change: that threw every verdict away
+--- and the window scanned over and over (a player's report, 2026-11-13).
+local function WornKey()
+    local parts = {}
+    for slot = 1, 19 do
+        local link = Items:Equipped(slot)
+        parts[slot] = link and (link:match("item:[^|%[]+") or link) or "-"
+    end
+    return table.concat(parts, ";")
+end
+Finder.WornKey = WornKey
+
+--- The worn gear's key, the most of its stats ever read for that gear, and
+--- how many read now. The client lets worn gear go from its memory now and
+--- then; the count falling then is not a change, and judging meanwhile
+--- would weigh every item against nothing.
+function Finder:WornState()
+    local key, read = WornKey(), WornStatsRead()
+    if key ~= self.wornKey then
+        self.wornKey, self.wornBest = key, read
+    elseif read > (self.wornBest or 0) then
+        self.wornBest = read
+    end
+    return key, self.wornBest, read
+end
+
 function Finder:JudgeKey()
     -- Worn gear whose stats had not loaded yet (just after login) scores
-    -- nothing, so its count is part of the key too.
+    -- nothing, so the most of its stats read is part of the key too.
+    local wornKey, wornBest = self:WornState()
     return table.concat({
-        tostring(Items:WornSignature()), tostring(WornStatsRead()), tostring(Items:PlayerLevel()),
+        tostring(wornKey), tostring(wornBest), tostring(Items:PlayerLevel()),
         tostring(Weights.generation or 0), tostring(self.judgeGeneration or 0),
         -- A character skipped for upgrades has none (Alts:SetSkipped).
         tostring(ns.Alts and ns.Alts:PlayerSkipped() or false),
@@ -814,12 +843,27 @@ function Finder:Build(only, ahead, pause)
     local worn = Compare:WornIDs()
     local slots, checked, waiting, asked = {}, 0, 0, 0
     local queue = {}
+    -- Worn gear the client let go of: ask for it back, and judge nothing new
+    -- until it is in, since every item would be weighed against nothing.
+    local _, wornBest, wornRead = self:WornState()
+    local wornShort = wornRead < (wornBest or 0)
+    if wornShort then
+        for slot = 1, 19 do
+            local link = Items:Equipped(slot)
+            local id = link and tonumber(link:match("item:(%d+)"))
+            if id and not Items:Stats(link) then self:Request(id) end
+        end
+    end
     for _, candidate in ipairs(self:Candidates(plan, only, pause)) do
         if pause then pause() end
         local itemID = candidate.itemID
-        local wearable = not carried[itemID] and Wearable(player.class, itemID)
+        -- An item judged before keeps its verdict, even when the client has
+        -- let go of its details since: asking again would start the scans
+        -- over and over, and the list would change each time.
+        local kept = not carried[itemID] and not worn[itemID] and judged[itemID] ~= nil
+        local wearable = kept or (not carried[itemID] and Wearable(player.class, itemID))
         if wearable ~= false then
-            if wearable == nil or not self:IsCached(itemID) then
+            if not kept and (wearable == nil or not self:IsCached(itemID)) then
                 -- One the server never answered is not waited on for ever.
                 if not self:GaveUp(itemID) then
                     waiting = waiting + 1
@@ -831,6 +875,8 @@ function Finder:Build(only, ahead, pause)
                         queue[#queue + 1] = itemID
                     end
                 end
+            elseif not kept and wornShort then
+                waiting = waiting + 1
             elseif not worn[itemID] then
                 local best, ok, result = self:JudgeOnce(judged, itemID)
                 if ok and result then
