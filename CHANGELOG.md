@@ -4,6 +4,17 @@ Versions follow [semantic versioning](https://semver.org): the middle number
 moves for new behaviour, the last for fixes alone. The newest version goes at
 the top; a release is refused if its version has no section here.
 
+## 0.9.0
+
+- The upgrade quest panel says why an upgrade was picked and what it asks of you.
+- How You Gear Up picks a style for your upgrade quests.
+- An Upgrade Done plaque shows when the gear goes on.
+- Quest log rows show which rewards are upgrades.
+- Queue It on a pattern you learn later queues the craft once you learn it.
+- Mute All Sounds quiets every Blackthornes sound at once.
+- Windows remember where you drag them.
+- Various bug fixes.
+
 ## 0.8.0
 
 - Druids can judge gear as a Bear Tank.

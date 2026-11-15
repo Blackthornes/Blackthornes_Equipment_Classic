@@ -23,6 +23,19 @@ tell a friend: no hype, no questions to the reader, no exclamation marks
 outside the thanks line, no dashes as punctuation, no "now you can". The
 tool prints a note for a shipped line that reads like an advert.
 
+## 0.9.0
+
+- The upgrade quest panel says why an upgrade was picked and what it asks of you.
+- How You Gear Up picks a style for your upgrade quests.
+- An Upgrade Done plaque shows when the gear goes on.
+- Quest log rows show which rewards are upgrades.
+- Queue It on a pattern you learn later queues the craft once you learn it.
+- Mute All Sounds quiets every Blackthornes sound at once.
+- Windows remember where you drag them.
+
+Fixes and changes:
+- Various bug fixes.
+
 ## 0.8.0
 
 - Druids can judge gear as a Bear Tank.
