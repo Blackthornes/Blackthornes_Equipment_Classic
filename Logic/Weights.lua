@@ -141,6 +141,9 @@ local SPECS = {
         },
         prot = {
             name = "Protection",
+            -- Tanks with a one-hander and a shield: a two-hander is never
+            -- an upgrade while judged as this spec (Compare:Judge).
+            shieldTank = true,
             weights = {
                 stamina = 1.0, strength = 0.6, agility = 0.6, armor = 0.1,
                 defense = 1.2, dodge = 12, parry = 10, block = 6, blockValue = 0.4,
@@ -167,6 +170,8 @@ local SPECS = {
         },
         prot = {
             name = "Protection",
+            -- Tanks with a one-hander and a shield, as Protection warriors do.
+            shieldTank = true,
             weights = {
                 stamina = 1.0, strength = 0.5, agility = 0.4, intellect = 0.3,
                 armor = 0.08, defense = 1.0, dodge = 10, parry = 8, block = 6,
@@ -802,6 +807,15 @@ function Weights:CurrentSpec()
     end
 
     return specs.default, "default", class
+end
+
+--- True for a spec that tanks with a one-hander and a shield (Protection
+--- warriors and paladins), so a two-hander is never an upgrade for it.
+--- Bear Tank druids can't use shields and are not one.
+function Weights:ShieldTank(class, spec)
+    local specs = class and SPECS[class]
+    local entry = specs and spec and specs[spec]
+    return type(entry) == "table" and entry.shieldTank == true
 end
 
 -- Each merged table's weapon kind numbers, kept beside it rather than in it,

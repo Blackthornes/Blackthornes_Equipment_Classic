@@ -382,6 +382,8 @@ function Alts:Judge(note, link)
 
     local usable, fromLevel = Weights:CanUse(note.class, info.classID, info.subclassID, info.equipLoc)
     if not usable or not Compare:ClassAllows(note.class, link) then return nil end
+    -- A Protection warrior or paladin tanks with a one-hander and a shield.
+    if info.equipLoc == "INVTYPE_2HWEAPON" and Weights:ShieldTank(note.class, spec) then return nil end
     -- Armor goes only to a character who wears that kind as its heaviest:
     -- no cloth for a leather wearer.
     if not Weights:IsBestArmor(note.class, note.level, info.classID, info.subclassID, info.equipLoc) then

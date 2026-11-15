@@ -74,9 +74,11 @@ local function Read(item, bag, slot)
     end
     -- No way this class ever wears it: gear for other classes, an armor or
     -- weapon kind it never learns. Not mail or plate learned later, Best
-    -- Armor Only or a hidden untrained weapon, which are only for now.
+    -- Armor Only, a hidden untrained weapon or a two-hander while judged as
+    -- Protection, which are only for now.
     if type(result) == "table" and result.verdict == "cantuse" and not result.laterArmor
-        and not result.lighterArmor and not result.ignoredSkill then
+        and not result.lighterArmor and not result.ignoredSkill
+        and not result.tankTwoHand then
         advice.never = true
     end
     if not tool then
