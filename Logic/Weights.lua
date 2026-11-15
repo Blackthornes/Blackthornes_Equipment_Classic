@@ -159,7 +159,7 @@ local SPECS = {
         holy = {
             name = "Holy",
             weights = {
-                intellect = 1.0, healing = 0.8, spellPower = 0.9, spirit = 0.5,
+                intellect = 1.0, healing = 0.8, spellPower = 0.45, spirit = 0.5,
                 stamina = 0.3, mp5 = 2, spellCrit = 10, armor = 0.005,
                 holyDamage = 0.3,
                 meleeDps = 0.3,
@@ -236,7 +236,7 @@ local SPECS = {
             name = "Holy",
             weights = {
                 intellect = 1.0, spirit = 0.9, stamina = 0.3, healing = 1.0,
-                spellPower = 0.8, mp5 = 2.5, spellCrit = 10, rangedDps = 2,
+                spellPower = 0.4, mp5 = 2.5, spellCrit = 10, rangedDps = 2,
                 holyDamage = 0.3, shadowDamage = 0.2,
                 meleeDps = 0.3,
                 armor = 0.01,
@@ -280,7 +280,7 @@ local SPECS = {
             name = "Restoration",
             weights = {
                 intellect = 1.0, spirit = 0.3, stamina = 0.4, healing = 1.0,
-                spellPower = 0.8, mp5 = 3, spellCrit = 10,
+                spellPower = 0.4, mp5 = 3, spellCrit = 10,
                 meleeDps = 0.3,
                 armor = 0.01,
             },
@@ -412,7 +412,7 @@ local SPECS = {
             name = "Restoration",
             weights = {
                 intellect = 1.0, spirit = 0.8, stamina = 0.4, healing = 1.0,
-                spellPower = 0.8, mp5 = 2.5, spellCrit = 8,
+                spellPower = 0.4, mp5 = 2.5, spellCrit = 8,
                 meleeDps = 0.3,
                 armor = 0.01,
             },
@@ -1428,18 +1428,47 @@ end
 --- Convert what GetItemStats returned into the names above. Keys this addon
 --- does not know are returned separately so the probe can show them.
 --- Ratings come back as the percent they give.
+--- Caster power is two totals (2026-11-12, a player's report): spellPower
+--- is what it adds to damage, healing what it adds to healing. Gear with
+--- "damage and healing" (ITEM_MOD_SPELL_POWER_SHORT) counts in both, and a
+--- damage or healing line on its own is read as that whole total, so gear
+--- that sends power and healing together is never counted twice.
+local CASTER_POWER = {
+    ITEM_MOD_SPELL_POWER_SHORT = "both",
+    ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "spellPower",
+    ITEM_MOD_SPELL_HEALING_DONE_SHORT = "healing",
+}
+Weights.CASTER_POWER = CASTER_POWER
+
+local function AddCasterPower(stats, power)
+    local both = power.both or 0
+    local damage = math.max(both, power.spellPower or 0)
+    local healing = math.max(both, power.healing or 0)
+    if damage > 0 then stats.spellPower = (stats.spellPower or 0) + damage end
+    if healing > 0 then stats.healing = (stats.healing or 0) + healing end
+end
+
 function Weights:Normalize(clientStats)
-    local stats, unknown = {}, {}
+    local stats, unknown, power = {}, {}, nil
     for key, value in pairs(clientStats or {}) do
         local rating = RATINGS[key]
+        if CASTER_POWER[key] and type(value) == "number" then
+            power = power or {}
+            local part = CASTER_POWER[key]
+            power[part] = (power[part] or 0) + value
+            rating = false
+        end
         local name = rating and rating.stat or STAT_KEYS[key] or SchoolKey(key)
-        if name and type(value) == "number" then
+        if rating == false then
+            -- caster power, added once the whole item is read
+        elseif name and type(value) == "number" then
             if rating then value = value / self:RatingPer(rating) end
             stats[name] = (stats[name] or 0) + value
         else
             unknown[#unknown + 1] = key
         end
     end
+    if power then AddCasterPower(stats, power) end
     table.sort(unknown)
     return stats, unknown
 end
