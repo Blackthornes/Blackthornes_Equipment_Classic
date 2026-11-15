@@ -157,6 +157,38 @@ Quest:OnEvent("GET_ITEM_INFO_RECEIVED", 1004, true)
 suite.check("an answer a scan asked for waits for the rest of the burst", updates == 0, updates)
 ns.Finder:AnswersSettled()
 suite.check("and looks again once they settle", updates == 1, updates)
+
+-- A tab's own upgrade: its answer is looked at once. The panel reading its
+-- link loads it again and the client says so every time; that is nothing
+-- new until the gear worn, the level or the weights move.
+do
+    local own, loaded = 7777, false
+    local realCached = C_Item.IsItemDataCachedByID
+    C_Item.IsItemDataCachedByID = function(id)
+        if id == own then return loaded end
+        return true
+    end
+    Quest.Update = function() updates = updates + 1 end
+    Quest:Quests().vendor = { itemID = own, source = { kind = "vendor" } }
+    Quest.ownHeard, Quest.waiting, Quest.updating = nil, false, false
+    updates = 0
+    Quest:OnEvent("GET_ITEM_INFO_RECEIVED", own, false)
+    suite.check("an answer that brought nothing still looks", updates == 1, updates)
+    loaded = true
+    Quest:OnEvent("GET_ITEM_INFO_RECEIVED", own, true)
+    suite.check("and so does the one that brought the item", updates == 2, updates)
+    for _ = 1, 25 do Quest:OnEvent("GET_ITEM_INFO_RECEIVED", own, true) end
+    suite.check("the same upgrade loading again looks at nothing", updates == 2, updates)
+    suite.check("a text id reads the same", Quest:OwnItemHeard(tostring(own)) == true)
+    ns.Weights:Changed()
+    updates = 0
+    Quest:OnEvent("GET_ITEM_INFO_RECEIVED", own, true)
+    Quest:OnEvent("GET_ITEM_INFO_RECEIVED", own, true)
+    suite.check("after a real change its answer counts once more", updates == 1, updates)
+    Quest:Quests().vendor = nil
+    Quest.ownHeard = nil
+    C_Item.IsItemDataCachedByID = realCached
+end
 Quest.Update = realUpdate
 
 --------------------------------------------------------------------------------

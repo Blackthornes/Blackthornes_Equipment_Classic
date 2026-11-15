@@ -1814,6 +1814,24 @@ function UpgradeQuest:OwnItem(itemID)
     return false
 end
 
+--- Has an answer about this own upgrade been looked at already, with the
+--- same gear, level and weights? Notes it when not. Not saved.
+function UpgradeQuest:OwnItemHeard(itemID)
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    if not (ok and id) then return false end
+    -- An answer that brought nothing (the client still lacks the item) is
+    -- not the one waited for: the next one counts.
+    local finder = ns.Finder
+    if finder and type(finder.IsCached) == "function" and not finder:IsCached(id) then
+        return false
+    end
+    local key = JudgeKeyNow() or false
+    self.ownHeard = self.ownHeard or {}
+    if self.ownHeard[id] == key then return true end
+    self.ownHeard[id] = key
+    return false
+end
+
 --- Is an item answer from the server about gear the quest cares about: an
 --- item a finder scan asked for, or one of the tabs' upgrades?
 function UpgradeQuest:WantsItem(itemID)
@@ -1859,6 +1877,11 @@ function UpgradeQuest:OnEvent(event, level)
             and not self:OwnItem(level) then
             return
         end
+        -- One of the tabs' own upgrades: its first answer lets it be judged
+        -- and its steps drawn. The panel reading its link loads it again,
+        -- and the client says so every time; that is nothing new until the
+        -- gear worn, the level or the weights move.
+        if self:OwnItemHeard(level) then return end
     end
     if event == "PLAYER_LEVEL_UP" then
         -- Look for gear the new level opened, for a little while.
