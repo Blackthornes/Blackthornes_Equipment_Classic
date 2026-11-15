@@ -746,6 +746,31 @@ function SettingsUI:BuildQuest()
     end, false)
     controls.questStepOnly:SetPoint("TOPLEFT", CONTROL_X, -2)
 
+    -- How You Gear Up (the upgrade quest mockups, card B): one pick that
+    -- sets the quest's boxes. Its hover says which boxes it sets.
+    local styles = ns.UpgradeQuest and ns.UpgradeQuest.STYLES or {}
+    local function StyleDescription(style)
+        local lines = ns.UpgradeQuest and ns.UpgradeQuest.StyleLines(style) or {}
+        if #lines == 0 then return "" end
+        return L["This sets:"] .. " " .. table.concat(lines, ", ")
+    end
+    local styleRow = pages:Row("quest", 1, L["How You Gear Up:"], "")
+    controls.questStyleRow = styleRow
+    controls.questStyle = Widgets.CreateChoice(styleRow, {
+        min = 1, max = math.max(1, #styles), step = 1, value = 1,
+        format = function(index) return styles[index] and styles[index].label or L["Anything"] end,
+        onChange = function(index)
+            local style = styles[index]
+            if style and ns.UpgradeQuest then ns.UpgradeQuest:SetStyle(style.key) end
+            if style and styleRow.SetDescription then styleRow:SetDescription(StyleDescription(style)) end
+        end,
+    })
+    local styleWords = {}
+    for index, style in ipairs(styles) do styleWords[index] = style.label end
+    ns.SettingsPages.FitStepper(controls.questStyle, styleWords)
+    controls.questStyle:SetPoint("TOPLEFT", CONTROL_X, -2)
+    SettingsUI.StyleDescription = StyleDescription
+
     -- The quest arrow, as the Arrow button on the quest panel and /beq
     -- arrow switch it, and /beq arrow next as a button. /beq arrow check is
     -- typed only (the owner, 2026-10-23).
@@ -1044,6 +1069,15 @@ function SettingsUI:Refresh()
     controls.soloQuests:SetChecked(ns.db.soloQuestsOnly == true)
     controls.questZoneSwap:SetChecked(ns.db.upgradeQuestZoneSwap ~= false)
     controls.questStepOnly:SetChecked(ns.db.upgradeQuestStepOnly == true)
+    if controls.questStyle and ns.UpgradeQuest then
+        local now = ns.UpgradeQuest:Style()
+        for index, style in ipairs(ns.UpgradeQuest.STYLES) do
+            if style.key == now.key then controls.questStyle:SetValue(index, true) end
+        end
+        if controls.questStyleRow.SetDescription then
+            controls.questStyleRow:SetDescription(SettingsUI.StyleDescription(now))
+        end
+    end
     local quest = ns.UpgradeQuest
     if quest and self.questPanelRow then
         local count = 0
