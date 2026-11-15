@@ -139,10 +139,17 @@ env.bags[0][1] = nil
 env.worn[5] = "item:1002"
 Quest:Update()
 suite.check("worn, the quest is complete", Quest:DoneCount() == 1)
-suite.check("with a banner", (function()
+suite.check("with Upgrade Done!", (function()
+    local done = ns.UpgradeDone
+    if ns.Motion and ns.Motion.Step then ns.Motion:Step(2) end
+    return done and done.frame and done.frame:IsShown()
+        and done.plaque and done.count:GetText() == "Done: 1"
+end)(), ns.UpgradeDone and ns.UpgradeDone.count and ns.UpgradeDone.count:GetText())
+suite.check("and no second banner", (function()
     for _, banner in ipairs(toasts) do
-        if banner.title == "Upgrade quest complete" then return true end
+        if banner.title == "Upgrade quest complete" then return false end
     end
+    return true
 end)())
 -- Nothing on offer beats what is worn now.
 suite.check("and nothing left to chase", Quest:Current() == nil and Quest.state == "none", Quest.state)

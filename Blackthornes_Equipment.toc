@@ -108,6 +108,8 @@ UI\MapPins.lua
 UI\SlotUpgrades.lua
 UI\MoreMarks.lua
 UI\QuestPanel.lua
+UI\QuestPanelMore.lua
+UI\UpgradeDone.lua
 UI\QuestLogTab.lua
 UI\DungeonQuestsWindow.lua
 UI\DungeonLootWindow.lua
