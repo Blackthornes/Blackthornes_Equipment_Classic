@@ -1757,6 +1757,16 @@ function UpgradeQuest:SetZoneOnly(on)
     if self:IsEnabled() then self:Update() else self:Changed() end
 end
 
+--- Is this item one of the tabs' own upgrades?
+function UpgradeQuest:OwnItem(itemID)
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    if not (ok and id) then return false end
+    for _, quest in pairs(self:Quests()) do
+        if type(quest) == "table" and quest.itemID == id then return true end
+    end
+    return false
+end
+
 --- Is an item answer from the server about gear the quest cares about: an
 --- item a finder scan asked for, or one of the tabs' upgrades?
 function UpgradeQuest:WantsItem(itemID)
@@ -1792,7 +1802,17 @@ function UpgradeQuest:OnEvent(event, level)
     if event == "PLAYER_ENTERING_WORLD" then newZone = true end
     -- The client loads items for chat links, vendors and other addons all
     -- the time; only answers this addon asked for are worth looking again.
-    if event == "GET_ITEM_INFO_RECEIVED" and not self:WantsItem(level) then return end
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        if not self:WantsItem(level) then return end
+        -- Answers to what a finder scan asked for come in bursts; the finder
+        -- tells us once they settle (WatchAnswers in OnEnable), so a burst
+        -- starts one scan, not one per answer.
+        local finder = ns.Finder
+        if finder and type(finder.WatchAnswers) == "function" and finder:Asked(level)
+            and not self:OwnItem(level) then
+            return
+        end
+    end
     if event == "PLAYER_LEVEL_UP" then
         -- Look for gear the new level opened, for a little while.
         self.levelledAt = ns.Finder and ns.Finder.Now() or Now()
@@ -1822,7 +1842,15 @@ function UpgradeQuest:OnEvent(event, level)
         end
         self.rescan = true
     end
-    if event == "BAG_UPDATE_DELAYED" then self.bagsChanged = true end
+    -- A stack growing or shrinking changes no upgrade; only gear coming or
+    -- going does. The steps still read the bags again below.
+    if event == "BAG_UPDATE_DELAYED" then
+        local finder = ns.Finder
+        if not (finder and type(finder.CarriedMoved) == "function")
+            or finder:CarriedMoved("upgradeQuest") then
+            self.bagsChanged = true
+        end
+    end
     self:UpdateSoon()
 end
 
@@ -1855,6 +1883,17 @@ function UpgradeQuest:OnEnable()
         ns.RegisterEvent(self, event, self.OnEvent)
     end
     if self:IsEnabled() then self:UpdateSoon(3) end
+end
+
+-- Answers to what a finder scan asked for come in bursts; the finder says
+-- once a burst settles, and the quest looks again then, once.
+if ns.Finder and type(ns.Finder.WatchAnswers) == "function" then
+    ns.Finder:WatchAnswers(function()
+        if UpgradeQuest:IsEnabled() then
+            UpgradeQuest.rescan = true
+            UpgradeQuest:UpdateSoon()
+        end
+    end)
 end
 
 --------------------------------------------------------------------------------

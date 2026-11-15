@@ -46,6 +46,11 @@ ArrowUI.SCALE = 0.65
 
 -- Redrawn this often, seconds: smooth to the eye, cheap to run.
 local STEP = 0.03
+-- With nowhere to point the words and heading hold still, so the state is
+-- only read again this often; the glow still breathes every STEP.
+local REST_STEP = 0.5
+local RESTING = { nowhere = true, blind = true }
+ArrowUI.REST_STEP = REST_STEP
 
 local function Clock()
     if type(GetTime) ~= "function" then return 0 end
@@ -411,8 +416,13 @@ function ArrowUI:Step(elapsed)
     if self.since < STEP then return end
     self.since = 0
 
-    local ok, err = pcall(self.Draw, self)
-    if not ok then ns.Debug("quest arrow:", tostring(err)) end
+    local resting = self.state and RESTING[self.state.mode]
+    self.restFor = (self.restFor or 0) + STEP
+    if not resting or self.restFor >= REST_STEP then
+        self.restFor = 0
+        local ok, err = pcall(self.Draw, self)
+        if not ok then ns.Debug("quest arrow:", tostring(err)) end
+    end
     if self.frame:IsShown() then pcall(self.Breathe, self, Clock()) end
 end
 

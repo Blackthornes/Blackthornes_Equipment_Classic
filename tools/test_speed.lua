@@ -98,7 +98,9 @@ Quest.waiting, Quest.updating = false, false
 for _ = 1, 20 do Quest:OnEvent("GET_ITEM_INFO_RECEIVED", 4242, true) end
 suite.check("twenty answers about a chat link look at nothing", updates == 0, updates)
 Quest:OnEvent("GET_ITEM_INFO_RECEIVED", 1004, true)
-suite.check("an answer a scan asked for looks again", updates == 1, updates)
+suite.check("an answer a scan asked for waits for the rest of the burst", updates == 0, updates)
+ns.Finder:AnswersSettled()
+suite.check("and looks again once they settle", updates == 1, updates)
 Quest.Update = realUpdate
 
 --------------------------------------------------------------------------------
@@ -207,6 +209,85 @@ _G.debugprofilestop = nil
 env.chat = {}
 ns.HandleSlash("perf")
 suite.check("a client with no timer says so", env.ChatText():find("no timer", 1, true) ~= nil)
+
+--------------------------------------------------------------------------------
+-- Scanning only when something that matters changes
+--------------------------------------------------------------------------------
+
+do
+    -- Item answers come in bursts: hold the timers, then let them run.
+    local held = {}
+    local realAfter = _G.C_Timer.After
+    _G.C_Timer.After = function(_, fn) held[#held + 1] = fn end
+    local stales, realMark = 0, Finder.MarkStale
+    Finder.MarkStale = function(self, ...) stales = stales + 1 return realMark(self, ...) end
+    Finder.asked = Finder.asked or {}
+    Finder.asked[1001], Finder.asked[1002], Finder.asked[1003] = true, true, true
+    Finder:OnItemAnswer(1001)
+    Finder:OnItemAnswer(1002)
+    Finder:OnItemAnswer(1003)
+    suite.check("a burst of answers marks nothing while it comes", stales == 0, stales)
+    for _, fn in ipairs(held) do fn() end
+    suite.check("and marks the scan out of date once when it settles", stales == 1, stales)
+    suite.check("an answer nobody asked for is left alone", Finder:OnItemAnswer(4242) == false)
+    _G.C_Timer.After = realAfter
+
+    stales = 0
+    Finder.carriedSeen = nil
+    env.bags[0] = { [1] = "item:1001" }
+    Finder:OnBags()
+    stales = 0
+    env.bags[0] = { [1] = "item:1001", [2] = "item:1001" }
+    Finder:OnBags()
+    suite.check("a stack growing marks nothing", stales == 0, stales)
+    env.bags[0] = { [2] = "item:1001" }
+    Finder:OnBags()
+    suite.check("moving a piece marks nothing", stales == 0, stales)
+    env.bags[0] = { [2] = "item:1001", [3] = "item:1002" }
+    Finder:OnBags()
+    suite.check("new gear in the bags marks the scan out of date", stales == 1, stales)
+    env.bags[0] = {}
+    Finder:OnBags()
+    Finder.MarkStale = realMark
+
+    -- A scan kept for a while is not looked at again every minute.
+    local clock = 5000
+    local realNow = Finder.Now
+    Finder.Now = function() return clock end
+    Finder:ScanInBackground()
+    local realBackground, again = Finder.ScanInBackground, 0
+    Finder.ScanInBackground = function() again = again + 1 end
+    clock = clock + 120
+    Finder:Latest()
+    suite.check("a scan two minutes old is still used", again == 0, again)
+    clock = clock + 300
+    Finder:Latest()
+    suite.check("one seven minutes old is looked at again", again == 1, again)
+    Finder.ScanInBackground = realBackground
+    Finder.Now = realNow
+end
+
+--------------------------------------------------------------------------------
+-- The arrow rests when it has nowhere to point
+--------------------------------------------------------------------------------
+
+do
+    local ArrowUI = ns.QuestArrowUI
+    local realDraw, draws = ArrowUI.Draw, 0
+    local frame = ArrowUI.frame
+    ArrowUI.frame = ArrowUI.frame or { IsShown = function() return false end }
+    ArrowUI.Draw = function(self) draws = draws + 1 end
+    ArrowUI.state = { mode = "nowhere" }
+    ArrowUI.since, ArrowUI.restFor = 0, 0
+    for _ = 1, 100 do ArrowUI:Step(0.03) end
+    suite.check("with nowhere to go it looks about twice a second, not thirty times",
+        draws >= 4 and draws <= 8, draws)
+    draws = 0
+    ArrowUI.state = { mode = "arrow" }
+    for _ = 1, 10 do ArrowUI:Step(0.03) end
+    suite.check("pointing somewhere it keeps up every step", draws == 10, draws)
+    ArrowUI.Draw, ArrowUI.frame, ArrowUI.state = realDraw, frame, nil
+end
 
 Compare.Judge = realJudge
 suite.done()

@@ -917,9 +917,15 @@ end
 --- once there is one) when the gear, the level or the bags changed since, at
 --- most every few seconds. For the character sheet's slots, which ask on
 --- every hover.
+local KEEP_LATEST = 300
+
 function Finder:Latest()
     if self.background then return self.latest end
-    local fresh = self.latest and not self.stale and (self.Now() - (self.latestAt or 0)) < 60
+    -- Kept until something it reads changes (an event marks it stale, the
+    -- key catches one whose event was missed), else for KEEP_LATEST seconds
+    -- for what no event tells (a reputation standing).
+    local fresh = self.latest and not self.stale and self.latestKey == self:JudgeKey()
+        and (self.Now() - (self.latestAt or 0)) < KEEP_LATEST
     if not fresh and (not self.latest or (self.Now() - (self.latestAt or 0)) >= 2) then
         -- Made a slice per frame, the last one kept on show meanwhile. The
         -- very first is too: done in one go, a hover froze the game.
@@ -936,6 +942,86 @@ end
 
 function Finder:MarkStale()
     self.stale = true
+end
+
+-- How long after the last answer the server sent about items a scan asked
+-- for before the scan is made again. The answers come in bursts of dozens;
+-- each one used to set off a full scan of every item.
+local ANSWER_SETTLE = 2
+Finder.ANSWER_SETTLE = ANSWER_SETTLE
+
+--- What wants to hear once a burst of item answers has settled, each
+--- called with no arguments (the upgrade quest, the finder window).
+Finder.answerWatchers = Finder.answerWatchers or {}
+
+function Finder:WatchAnswers(fn)
+    if type(fn) == "function" then self.answerWatchers[#self.answerWatchers + 1] = fn end
+end
+
+--- The burst of answers is over: the scan is out of date, and whatever
+--- watches looks again, once.
+function Finder:AnswersSettled()
+    self:MarkStale()
+    for _, fn in ipairs(self.answerWatchers) do
+        local ok, err = pcall(fn)
+        if not ok then ns.Debug("finder:", tostring(err)) end
+    end
+end
+
+--- GET_ITEM_INFO_RECEIVED: an answer about an item a scan asked for waits
+--- until no more have come for ANSWER_SETTLE seconds. Without timers it
+--- counts at once.
+function Finder:OnItemAnswer(itemID)
+    if not self:Asked(itemID) then return false end
+    -- Each answer starts its own wait; only the wait of the last answer in
+    -- a burst finds the count unchanged and settles.
+    self.answers = (self.answers or 0) + 1
+    local mine = self.answers
+    local after = _G.C_Timer and _G.C_Timer.After
+    if type(after) ~= "function" then
+        self:AnswersSettled()
+        return true
+    end
+    after(ANSWER_SETTLE, function()
+        if Finder.answers == mine then Finder:AnswersSettled() end
+    end)
+    return true
+end
+
+--- The gear the finder could list that is in the bags, as one string:
+--- only that changes a scan (Carried leaves it out). Sorted by item ID, so
+--- moving a piece or a stack growing says nothing changed.
+function Finder:CarriedSignature()
+    local items = ns.Sources and ns.Sources.ITEMS or {}
+    local forever = ns.Sources and ns.Sources.FOREVER or {}
+    local crafts = ns.Crafts and ns.Crafts.ITEMS or {}
+    local seen, ids = {}, {}
+    for id in pairs(self:Carried()) do
+        if not seen[id] and (items[id] or forever[id] or crafts[id]) then
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
+    end
+    table.sort(ids)
+    return table.concat(ids, ",")
+end
+
+--- Did the gear the finder could list in the bags change since `who` last
+--- asked? True the first time each asks.
+function Finder:CarriedMoved(who)
+    local ok, now = pcall(self.CarriedSignature, self)
+    if not ok then return true end
+    self.carriedSeen = self.carriedSeen or {}
+    local key = who or "finder"
+    if self.carriedSeen[key] == now then return false end
+    self.carriedSeen[key] = now
+    return true
+end
+
+--- BAG_UPDATE_DELAYED: a scan is out of date only when gear it could list
+--- came into or left the bags. Loot, crafting and stacks leave it alone.
+function Finder:OnBags()
+    if self:CarriedMoved("finder") then self:MarkStale() end
 end
 
 --------------------------------------------------------------------------------
@@ -1047,14 +1133,15 @@ function Finder:ScanSliced(only, ahead, done)
 end
 
 function Finder:OnEnable()
-    for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "BAG_UPDATE_DELAYED",
+    for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP",
         "TRAIT_CONFIG_UPDATED", "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE" }) do
         ns.RegisterEvent(self, event, self.MarkStale)
     end
+    ns.RegisterEvent(self, "BAG_UPDATE_DELAYED", self.OnBags)
     -- Only answers a scan asked for: the client loads items for chat links
-    -- and the auction house all the time.
+    -- and the auction house all the time. Counted once the burst settles.
     ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
-        if Finder:Asked(itemID) then Finder:MarkStale() end
+        Finder:OnItemAnswer(itemID)
     end)
     ns.RegisterEvent(self, "QUEST_TURNED_IN", self.OnQuestTurnedIn)
     -- Talents move the spec the weights come from: Forever's trait tree,

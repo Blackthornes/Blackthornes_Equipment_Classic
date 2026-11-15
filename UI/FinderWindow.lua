@@ -2589,7 +2589,7 @@ end
 
 local EVENTS = {
     "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP",
-    "QUEST_TURNED_IN", "TRAIT_CONFIG_UPDATED", "BAG_UPDATE_DELAYED",
+    "QUEST_TURNED_IN", "TRAIT_CONFIG_UPDATED",
     "CHARACTER_POINTS_CHANGED", "PLAYER_TALENT_UPDATE",
 }
 
@@ -2599,8 +2599,20 @@ function FinderUI:OnEnable()
     end
     -- Only answers the finder asked for: the client loads items for chat
     -- links, the auction house and other addons all the time.
-    ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
-        if Finder:Asked(itemID) then FinderUI:RefreshSoon() end
+    -- They come in bursts, so the window looks again once they settle.
+    if type(Finder.WatchAnswers) == "function" then
+        Finder:WatchAnswers(function() FinderUI:RefreshSoon() end)
+    else
+        ns.RegisterEvent(self, "GET_ITEM_INFO_RECEIVED", function(_, _, itemID)
+            if Finder:Asked(itemID) then FinderUI:RefreshSoon() end
+        end)
+    end
+    -- A stack growing or shrinking changes no upgrade; gear coming or going
+    -- does.
+    ns.RegisterEvent(self, "BAG_UPDATE_DELAYED", function()
+        if type(Finder.CarriedMoved) ~= "function" or Finder:CarriedMoved("finderUI") then
+            FinderUI:RefreshSoon()
+        end
     end)
     -- A new zone has its own list while "This zone only" is ticked, and
     -- always its own green zone names and nearest-first order.

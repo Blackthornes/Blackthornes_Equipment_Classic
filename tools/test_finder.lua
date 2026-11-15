@@ -380,8 +380,10 @@ do
     suite.check("an item nobody here asked for rescans nothing", builds == 0, builds)
     ns.Finder.asked[1003] = true
     Fire("GET_ITEM_INFO_RECEIVED", 1003, true)
-    suite.check("one the finder asked for rescans", builds >= 1, builds)
+    ns.Finder:AnswersSettled()
+    suite.check("one the finder asked for rescans once the answers settle", builds >= 1, builds)
     builds, paused = 0, 0
+    ns.Finder.carriedSeen = nil
     Fire("BAG_UPDATE_DELAYED")
     suite.check("a bag change rescans a slice at a time", builds >= 1 and paused == builds, paused .. "/" .. builds)
     builds = 0

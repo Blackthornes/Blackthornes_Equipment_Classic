@@ -618,9 +618,14 @@ for _, tab in ipairs(Quest.TABS) do
     if not Quest:Quests()[tab.key] and Quest.states[tab.key] == "none" then emptyNone = emptyNone + 1 end
 end
 suite.check("some tab has nothing to chase", emptyNone > 0, emptyNone)
--- Each event also reaches the finder, which marks its last scan out of date.
+-- Each event also reaches the finder, which marks its last scan out of date
+-- (a bag change only when gear it could list came or went).
 local function Event(name)
-    if name ~= "QUEST_LOG_UPDATE" and name ~= "ZONE_CHANGED_NEW_AREA" then ns.Finder:MarkStale() end
+    if name == "BAG_UPDATE_DELAYED" then
+        ns.Finder:OnBags()
+    elseif name ~= "QUEST_LOG_UPDATE" and name ~= "ZONE_CHANGED_NEW_AREA" then
+        ns.Finder:MarkStale()
+    end
     Quest:OnEvent(name)
 end
 local realBuild, scans = ns.Finder.Build, 0
@@ -633,11 +638,9 @@ end
 suite.check("twenty loots and quest log ticks scan nothing", scans == 0, scans)
 clock = clock + 61
 Event("BAG_UPDATE_DELAYED")
-suite.check("a bag change a minute later looks once", scans == 1, scans)
-Event("BAG_UPDATE_DELAYED")
-suite.check("and not again straight after", scans == 1, scans)
+suite.check("a bag change with no new gear looks at nothing, even a minute later", scans == 0, scans)
 Event("PLAYER_EQUIPMENT_CHANGED")
-suite.check("new gear worn looks again", scans == 2, scans)
+suite.check("new gear worn looks again", scans == 1, scans)
 ns.Finder.Build = realBuild
 _G.time = realTime
 
