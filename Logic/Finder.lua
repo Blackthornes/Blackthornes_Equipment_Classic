@@ -592,6 +592,10 @@ function Finder:Request(itemID)
     if (self.tries[itemID] or 0) >= ASK_TRIES then return false end
     if self.QuestWindowOpen() then return false end
     self.asked[itemID] = true
+    -- Waiting on the server for this one. Only its answer counts; the client
+    -- says the same event again whenever it loads the item for anyone else.
+    self.pending = self.pending or {}
+    self.pending[itemID] = true
     self.tries[itemID] = (self.tries[itemID] or 0) + 1
     local C = _G.C_Item
     local request = C and C.RequestLoadItemDataByID
@@ -1092,7 +1096,13 @@ end
 --- until no more have come for ANSWER_SETTLE seconds. Without timers it
 --- counts at once.
 function Finder:OnItemAnswer(itemID)
-    if not self:Asked(itemID) then return false end
+    -- One answer for each time we asked. An item asked about once is loaded
+    -- again and again by the client (a tooltip, a link, our own list), and
+    -- each of those used to start another scan with the window open.
+    local ok, id = pcall(function() return tonumber(itemID) end)
+    local pending = self.pending
+    if not (ok and id and pending and pending[id]) then return false end
+    pending[id] = nil
     -- Each answer starts its own wait; only the wait of the last answer in
     -- a burst finds the count unchanged and settles.
     self.answers = (self.answers or 0) + 1

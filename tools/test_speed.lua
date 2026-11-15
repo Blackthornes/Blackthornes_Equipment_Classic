@@ -276,6 +276,7 @@ do
     Finder.MarkStale = function(self, ...) stales = stales + 1 return realMark(self, ...) end
     Finder.asked = Finder.asked or {}
     Finder.asked[1001], Finder.asked[1002], Finder.asked[1003] = true, true, true
+    Finder.pending = { [1001] = true, [1002] = true, [1003] = true }
     Finder:OnItemAnswer(1001)
     Finder:OnItemAnswer(1002)
     Finder:OnItemAnswer(1003)
@@ -293,6 +294,7 @@ do
     -- start yet another scan, or it never stops.
     held = {}
     Finder.asked[1004] = true
+    Finder.pending[1004] = true
     Finder:OnItemAnswer(1004)
     for _, fn in ipairs(held) do fn() end
     suite.check("the answers after that follow-up start no more scans", settled[2] == false, tostring(settled[2]))
