@@ -1040,7 +1040,7 @@ function QuestPanel:FillBody(quest, steps, current, done)
         local text
         if state == "waiting" then
             text = L["Looking for your next upgrade..."]
-        elseif ns.UpgradeQuest:ZoneOnly() then
+        elseif ns.UpgradeQuest:KeepsToZone() then
             text = L.Format("%s Only this zone is searched. Untick This zone only to look everywhere, or try another tab.",
                 ns.UpgradeQuest.NONE[ns.UpgradeQuest:Tab()] or L["No upgrade to chase right now."])
         else

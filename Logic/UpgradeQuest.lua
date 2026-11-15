@@ -339,6 +339,34 @@ function UpgradeQuest:ZoneOnly()
     return ns.db ~= nil and ns.db.upgradeQuestZoneOnly == true
 end
 
+--- Does the quest keep to the zone the character is in? It does while
+--- "This zone only" is ticked on the quest panel or in Where to get
+--- upgrades (`finderZoneOnly`; a player's report, 2026-11-13: the window
+--- kept to the zone and the quest did not).
+function UpgradeQuest:KeepsToZone()
+    return self:ZoneOnly() or (ns.db ~= nil and ns.db.finderZoneOnly == true)
+end
+
+--- Would Where to get upgrades list this source? The quest picks only what
+--- the window's own filters let through: a source box left unticked
+--- (`finderSourcesOff`, "raid" for a raid's drop) and "Only what I can get
+--- now" (`finderGetNow`: no craft that you or your other characters can't
+--- make yet). Read straight from the save, so the window need not be open.
+function UpgradeQuest.WindowAllows(source, pick)
+    if type(source) ~= "table" then return false end
+    local db = ns.db
+    if not db then return true end
+    local kind = source.kind
+    if kind == "dungeon" and source.raid then kind = "raid" end
+    local off = db.finderSourcesOff
+    if type(off) == "table" and kind and off[kind] == true then return false end
+    if db.finderGetNow == true then
+        if type(pick) == "table" and pick.needs then return false end
+        if source.kind == "craft" and source.state ~= "known" and source.state ~= "alt" then return false end
+    end
+    return true
+end
+
 --- Does a new zone let go of the tabs' quests elsewhere while "This zone
 --- only" is ticked? Saved account wide as `upgradeQuestZoneSwap`, on
 --- unless unticked (the owner asked 2026-10-08 for a way to stop it).
@@ -402,11 +430,13 @@ function UpgradeQuest.SourceZone(source)
 end
 
 --- The easiest of a pick's sources (only those for one tab, when `tab` is
---- given, and only those in the zone `here`, when it is), and how easy it is.
-function UpgradeQuest.BestSource(sources, zone, tab, here)
+--- given, only those in the zone `here`, when it is, and with `filtered`
+--- only those Where to get upgrades' filters let through), and how easy it is.
+function UpgradeQuest.BestSource(sources, zone, tab, here, filtered)
     local best, bestEase
     for _, source in ipairs(sources or {}) do
-        if (not tab or source.kind == tab) and UpgradeQuest.InZone(source, here) then
+        if (not tab or source.kind == tab) and UpgradeQuest.InZone(source, here)
+            and (not filtered or UpgradeQuest.WindowAllows(source)) then
             local ease = UpgradeQuest.Ease(source, zone)
             if not best or ease > bestEase then best, bestEase = source, ease end
         end
@@ -435,7 +465,7 @@ function UpgradeQuest:Choose(found, except, tab)
     local skipped = self:Skipped()
     local zone = found.player and found.player.zone
     -- Read now: the scan may be from before the last zone change.
-    local here = self:ZoneOnly() and (self.Zone() or zone) or nil
+    local here = self:KeepsToZone() and (self.Zone() or zone) or nil
     local everything = type(found.all) == "table" and found.all or nil
     -- Only a few of the best per slot are kept for the finder's window; the
     -- best in this zone is seldom among them, so look at them all.
@@ -448,7 +478,7 @@ function UpgradeQuest:Choose(found, except, tab)
             if pick.rep then crowded[slot] = true end
             if not pick.needs and not pick.remote and not pick.at and not skipped[pick.itemID]
                 and not (except and except[pick.itemID]) and (repToo or not pick.rep) then
-                local source, ease = self.BestSource(pick.sources, zone, tab, here)
+                local source, ease = self.BestSource(pick.sources, zone, tab, here, true)
                 if source then
                     local worth = Worth(pick.result, pick.gain or 0, ease)
                     local held = best
@@ -487,7 +517,7 @@ function UpgradeQuest:Start(pick, source)
         source = Copy(source),
         -- Picked while "This zone only" was ticked: let go when it is
         -- unticked, so the tab picks again from anywhere.
-        here = self:ZoneOnly() or nil,
+        here = self:KeepsToZone() or nil,
     }
     self:Quests()[tab] = quest
     self:Mirror()
@@ -662,7 +692,7 @@ function UpgradeQuest:PickEmpty()
     if #empty == 0 and IS_TAB[ns.charDB.upgradeQuestTab] then return end
     -- "This zone only" on a flight: the zone below is not where the player
     -- is going, so the tabs wait for the landing.
-    if self:ZoneOnly() and self.OnTaxi() then return end
+    if self:KeepsToZone() and self.OnTaxi() then return end
     if not self:WorthLooking(empty) then return end
 
     local found, why = self:Look()
@@ -1766,7 +1796,7 @@ end
 --- nothing is let go on a flight or inside a dungeon (UpgradeQuest.Passing).
 -- @return true when one was let go
 function UpgradeQuest:LetGoOutOfZone()
-    if not self:ZoneOnly() or self.Passing() then return false end
+    if not self:KeepsToZone() or self.Passing() then return false end
     local here = self.Zone()
     if not here then return false end
     local quests = self:Quests()
@@ -1790,11 +1820,35 @@ function UpgradeQuest:SetZoneOnly(on)
     ns.db.upgradeQuestZoneOnly = on and true or false
     if on then
         self:LetGoOutOfZone()
-    else
+    elseif not self:KeepsToZone() then
         local quests = self:Quests()
         for _, tab in ipairs(TABS) do
             local quest = Valid(quests[tab.key])
             if quest and quest.here and not quest.followed then quests[tab.key] = nil end
+        end
+    end
+    self:Mirror()
+    self.rescan = true
+    self.offer = nil
+    self.lastStep = nil
+    if self:IsEnabled() then self:Update() else self:Changed() end
+end
+
+--- Where to get upgrades' "This zone only", source boxes or "Only what I
+--- can get now" changed. The tabs' quests those filters now leave out are
+--- let go (not skipped, so they can come back), as is a quest picked while
+--- a zone box was ticked once neither is; a quest followed from the window
+--- stays. Then each empty tab picks again.
+function UpgradeQuest:WindowFiltersChanged()
+    if not ns.db then return end
+    local keeps = self:KeepsToZone()
+    if keeps then self:LetGoOutOfZone() end
+    local quests = self:Quests()
+    for _, tab in ipairs(TABS) do
+        local quest = Valid(quests[tab.key])
+        if quest and not quest.followed
+            and ((quest.here and not keeps) or not self.WindowAllows(quest.source)) then
+            quests[tab.key] = nil
         end
     end
     self:Mirror()
@@ -1898,7 +1952,7 @@ function UpgradeQuest:OnEvent(event, level)
     -- so that waits for the landing.
     -- Unless "Change on a new zone" is unticked: then the quests stay, but
     -- a tab that found nothing in the last zone still looks in this one.
-    if newZone and self:ZoneOnly() then
+    if newZone and self:KeepsToZone() then
         if self.OnTaxi() then
             if self:ZoneSwap() then
                 self.landing = true
