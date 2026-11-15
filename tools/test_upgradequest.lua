@@ -230,6 +230,48 @@ suite.check("beaten in the bags, it is dropped too", Quest:Current() == nil or Q
 env.bags[0][1] = nil
 env.worn[5] = "item:900"
 
+-- Let go, and not picked straight back. The game, asked now, says the
+-- quest's upgrade is none, while the finder's kept verdicts still list it
+-- (gear, level and settings stand still). It used to be picked again and let
+-- go again, a whole scan each time, for as long as the panel was up.
+Reset()
+ns.Finder:MarkStale()
+Quest:Update()
+local loop = Quest:Current()
+suite.check("a quest to let go", loop ~= nil)
+local realWanted = Quest.StillWanted
+Quest.StillWanted = function(self, quest)
+    if quest and loop and quest.itemID == loop.itemID then return false end
+    return realWanted(self, quest)
+end
+local function Beaten()
+    local count = 0
+    for _, banner in ipairs(toasts) do
+        if banner.title == "You already beat this one" then count = count + 1 end
+    end
+    return count
+end
+local bannersBefore = Beaten()
+Quest:Update()
+local changesAfter = ns.Finder.changes
+for _ = 1, 6 do Quest:Update() end
+local back = Quest:Current()
+suite.check("let go, it is not picked straight back", back == nil or back.itemID ~= loop.itemID,
+    back and back.itemID)
+suite.check("and nothing marks the finder stale again", ns.Finder.changes == changesAfter,
+    tostring(ns.Finder.changes) .. " " .. tostring(changesAfter))
+suite.check("and it is said once", Beaten() == bannersBefore + 1, Beaten() - bannersBefore)
+suite.check("so the last scan stays the newest", ns.Finder.stale == false)
+-- Gear moves (the finder's own key with it): it can be picked again.
+Quest.StillWanted = realWanted
+env.worn[5] = "item:1003"
+Reset()
+ns.Finder:MarkStale()
+Quest:Update()
+suite.check("once gear moves it can be picked again", Quest.letGo[loop.itemID] == nil
+    and Quest:Current() ~= nil, Quest:Current() and Quest:Current().itemID)
+env.worn[5] = "item:900"
+
 --------------------------------------------------------------------------------
 -- Waiting on the server
 --------------------------------------------------------------------------------
