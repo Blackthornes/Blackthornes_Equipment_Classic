@@ -394,12 +394,20 @@ function QuestPanel:LayoutTabs(frame)
         for _, button in ipairs(self.tabs) do button.label:SetFont(Theme.FONT, Theme.sizes.tiny, "") end
         widths, total = Widths()
     end
+    -- Still too wide in the smaller letters (a long language): share the
+    -- room out by each name's width, and let a name wrap onto two lines.
+    if total > room then
+        for index in ipairs(widths) do widths[index] = widths[index] * room / total end
+        total = room
+    end
     local extra = math.max(0, room - total) / #self.tabs
     local x = PAD
     for index, button in ipairs(self.tabs) do
         button:ClearAllPoints()
         button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -HEADER)
         button:SetWidth(widths[index] + extra)
+        if button.label.SetWordWrap then button.label:SetWordWrap(true) end
+        button.label:SetWidth(math.max(1, widths[index] + extra - 6))
         x = x + widths[index] + extra + TAB_GAP
     end
     self.tabFont = size
@@ -803,6 +811,7 @@ function QuestPanel:Build()
     local gain = Theme.CreateLabel(item, "tiny", "good")
     gain:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
     gain:SetWidth(WIDTH - PAD * 2 - ICON - 12)
+    if gain.SetWordWrap then gain:SetWordWrap(true) end
     self.gain = gain
 
     -- How far along: gold filling to green.
@@ -1135,9 +1144,11 @@ function QuestPanel:FillBody(quest, steps, current, done)
     -- In its rarity colour, even for a quest saved before the client sent it.
     local shown = ns.Items.ShowLink(quest.link) or "?"
     self.name:SetText(shown)
-    local nameLines = math.min(2, QuestPanel.Lines("normal", shown, textWidth))
-    self.gain:SetText(QuestPanel.GainText(quest))
-    local itemHeight = math.max(ICON, 4 + nameLines * LINE_HEIGHT.normal + 3 + LINE_HEIGHT.tiny)
+    local nameLines = math.max(1, QuestPanel.Lines("normal", shown, textWidth))
+    local gainText = QuestPanel.GainText(quest)
+    self.gain:SetText(gainText)
+    local gainLines = math.max(1, QuestPanel.Lines("tiny", gainText or "", textWidth))
+    local itemHeight = math.max(ICON, 4 + nameLines * LINE_HEIGHT.normal + 3 + gainLines * LINE_HEIGHT.tiny)
     -- Why this one was picked, under the gain (card A).
     if more then itemHeight = math.max(ICON, itemHeight + more:FillWhy(self, quest, textWidth)) end
     self.item:SetHeight(itemHeight)

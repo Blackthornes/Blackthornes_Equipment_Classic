@@ -106,6 +106,7 @@ function More:BuildGear(panel)
     for index, rating in ipairs(ns.UpgradeQuest.RATINGS) do
         local label = Theme.CreateLabel(box, "tiny", "dim", "CENTER")
         label:SetWidth(quarter)
+        if label.SetWordWrap then label:SetWordWrap(true) end
         label:SetPoint("TOPLEFT", (index - 1) * quarter, -25)
         label:SetText(rating.label)
         box.labels[index] = label
@@ -250,7 +251,7 @@ local function BuildAlsoRow(panel, index)
     number:SetText(tostring(index + 1))
     local gain = Theme.CreateLabel(row, "small", "good", "RIGHT")
     gain:SetPoint("RIGHT", -6, 0)
-    gain:SetWidth(44)
+    gain:SetWidth(56)
     row.gain = gain
     local source = Theme.CreateLabel(row, "tiny", "muted", "RIGHT")
     source:SetPoint("RIGHT", gain, "LEFT", -6, 0)
@@ -259,7 +260,7 @@ local function BuildAlsoRow(panel, index)
     row.source = source
     local name = Theme.CreateLabel(row, "small", "text")
     name:SetPoint("LEFT", medal, "RIGHT", 6, 0)
-    name:SetWidth(INNER - 26 - 44 - 120 - 18)
+    name:SetWidth(INNER - 26 - 56 - 120 - 18)
     name:SetWordWrap(true)
     row.name = name
     row:SetScript("OnEnter", function(self)
@@ -325,7 +326,7 @@ function More:FillAlso(panel, quest, y)
         row.name:SetText(shown)
         row.source:SetText(More.SourceText(entry.source))
         row.gain:SetText(More.PercentText(entry.pick))
-        local tall = math.max(Lines("small", shown, INNER - 208) * 13,
+        local tall = math.max(Lines("small", shown, INNER - 220) * 13,
             Lines("tiny", row.source:GetText() or "", 120) * 12)
         row:SetHeight(math.max(More.ALSO_ROW, tall + 8))
         row:ClearAllPoints()
@@ -356,6 +357,8 @@ local function BuildChip(panel)
     chip.bang = bang
     local text = Theme.CreateLabel(chip, "tiny", "text")
     text:SetPoint("LEFT", mark, "RIGHT", 4, 0)
+    -- Long words wrap onto a second line; they never end in "...".
+    text:SetWordWrap(true)
     chip.text = text
     return chip
 end
@@ -369,7 +372,9 @@ function More:FillChips(panel, quest, y)
     self.chipMet = self.chipMet or {}
     local fresh = self.chipQuest ~= quest.itemID
     self.chipQuest = quest.itemID
-    local x, row = 0, 0
+    -- The chip's mark and padding take 28; the text gets the rest of a line.
+    local most = INNER - 28
+    local x, rowTop, rowTall = 0, 0, 0
     for index, entry in ipairs(list) do
         local chip = panel.chips[index]
         if not chip then
@@ -377,18 +382,25 @@ function More:FillChips(panel, quest, y)
             panel.chips[index] = chip
         end
         chip.text:SetText(entry.text)
-        local width = math.min(INNER, 4 + 12 + 4 + Width("tiny", entry.text) + 8)
-        chip.text:SetWidth(width - 28)
+        -- A little more than measured: given its exact width, the game's
+        -- font can still cut the last word short ("Part of a 4 quest ch...").
+        local textWidth = math.min(most, Width("tiny", entry.text) + 6)
+        local lines = math.max(1, Lines("tiny", entry.text, textWidth))
+        local width = textWidth + 28
+        local height = math.max(More.CHIP_HEIGHT, lines * 12 + 6)
+        chip.text:SetWidth(textWidth)
         chip:SetWidth(width)
+        chip:SetHeight(height)
         local key = entry.met and "good" or "loss"
         if Theme.SetBorderColor then pcall(Theme.SetBorderColor, chip.edges, key, 0.8) end
         chip.mark:SetShown(entry.met)
         chip.bang:SetShown(not entry.met)
         if x > 0 and x + width > INNER then
-            x, row = 0, row + 1
+            x, rowTop, rowTall = 0, rowTop + rowTall + More.CHIP_GAP, 0
         end
+        rowTall = math.max(rowTall, height)
         chip:ClearAllPoints()
-        chip:SetPoint("TOPLEFT", PAD + x, -(y + row * (More.CHIP_HEIGHT + More.CHIP_GAP)))
+        chip:SetPoint("TOPLEFT", PAD + x, -(y + rowTop))
         chip:Show()
         x = x + width + More.CHIP_GAP
         -- Slide in once for a new quest; flip once when one comes true.
@@ -407,7 +419,7 @@ function More:FillChips(panel, quest, y)
             chip:SetAlpha(1)
         end
     end
-    return (row + 1) * (More.CHIP_HEIGHT + More.CHIP_GAP) + 4
+    return rowTop + rowTall + More.CHIP_GAP + 4
 end
 
 --------------------------------------------------------------------------------
@@ -505,7 +517,7 @@ function More:FillFoot(panel, y)
     if ignored > 0 then
         local words = L.Format("Ignored (%d)", ignored)
         foot.ignored.text:SetText(words)
-        foot.ignored:SetWidth(Width("tiny", words) + 4)
+        foot.ignored:SetWidth(Width("tiny", words) + 8)
         foot.ignored:Show()
     else
         foot.ignored:Hide()
