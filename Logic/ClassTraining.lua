@@ -674,6 +674,10 @@ function CT:ShowTheWay()
     end
     local title = L.Format("%s trainer: %s", player.className or "", spot.name or "")
     local shown = false
+    -- Our own gold marker always goes on the map (UI/SpotMarker.lua):
+    -- Forever turns the game's pin down (a German player found nothing at
+    -- the Crossroads, 2026-10-29). It goes when you stand there.
+    CT.Mark(spot)
     local guide = self:GuideFn()
     if guide then
         local ok, done = pcall(guide, spot, title)
@@ -724,7 +728,17 @@ end
 function CT.Mark(spot)
     local marker = ns.SpotMarker
     local mapID = spot and Number(spot.mapID)
-    local x, y = spot and Number(spot.x), spot and T.TripTo(spot)
+    local x, y = spot and Number(spot.x), spot and Number(spot.y)
+    if not (marker and marker.Show and mapID and x and y) then return false end
+    local ok, laid = pcall(marker.Show, marker, { map = mapID, x = x * 100, y = y * 100 },
+        { name = spot.name, arrow = ns.WayArrow })
+    return ok and laid == true
+end
+
+--- The way there to a trainer far away, by Logic/Travel.lua (the same
+--- file in every Blackthornes addon): { lines, point }, or nil when it is
+--- near, "Guide Me:" is off, the addon has no Travel or no way is known.
+function CT.TripTo(spot)
     local Travel = ns.Travel
     if not (Travel and Travel.IsOn and Travel.IsOn() and spot and spot.zone) then return nil end
     local target = { name = spot.name, zone = spot.zone, map = spot.mapID, mx = spot.x, my = spot.y }
