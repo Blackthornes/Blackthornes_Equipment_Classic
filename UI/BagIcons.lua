@@ -353,8 +353,9 @@ function BagIcons:Sells(bag, slot, link, result)
     if type(result) ~= "table" or result.verdict == "upgrade" then return false end
     -- On a character skipped for upgrades, gear one of the others would
     -- wear is kept for them, not sold (a crafting alt making gear for a main).
+    -- The slot goes too, so a soulbound copy, which can't be mailed, still sells.
     if result.skipped and ns.Alts then
-        local ok, alt = pcall(ns.Alts.BestFor, ns.Alts, link)
+        local ok, alt = pcall(ns.Alts.BestFor, ns.Alts, link, bag, slot)
         if not ok or alt then return false end
     end
 
